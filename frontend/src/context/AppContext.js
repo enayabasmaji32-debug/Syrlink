@@ -47,6 +47,13 @@ export function AppProvider({ children }) {
   // WebSocket for real-time online status
   const { onlineUsers, isUserOnline } = useOnlineStatus(token);
 
+  // On mount: silently ping the backend to wake it up (Render free tier sleeps after inactivity)
+  useEffect(() => {
+    fetch(`${process.env.REACT_APP_BACKEND_URL}/api/auth/me`, {
+      signal: AbortSignal.timeout(60000),
+    }).catch(() => {});
+  }, []);
+
   // On mount: try to restore session - NON-BLOCKING
   useEffect(() => {
     const storedConsent = getCookie('li_cookie_consent') === 'yes';
