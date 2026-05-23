@@ -1,0 +1,22 @@
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+
+# Environment files
+.env
+.env.local
+
+# Build artifacts
+frontend/build/
+
+# OS files
+.DS_Store
+Thumbs.db
