@@ -16,6 +16,7 @@ export default function Login() {
   const [email, setEmail] = useState('demo@syrlink.com');
   const [password, setPassword] = useState('demo1234');
   const [loading, setLoading] = useState(false);
+  const [slowConn, setSlowConn] = useState(false);
   const [err, setErr] = useState('');
   const [cookieConsent, setCookieConsent] = useState(false);
   const [showCookieModal, setShowCookieModal] = useState(false);
@@ -68,6 +69,8 @@ export default function Login() {
       return;
     }
     setLoading(true);
+    setSlowConn(false);
+    const slowTimer = setTimeout(() => setSlowConn(true), 3000);
     try {
       await login(email, password);
       toast.success('Welcome back!');
@@ -75,6 +78,8 @@ export default function Login() {
     } catch (e) {
       setErr(fmtErr(e.response?.data?.detail) || e.message);
     } finally {
+      clearTimeout(slowTimer);
+      setSlowConn(false);
       setLoading(false);
     }
   };
@@ -118,8 +123,11 @@ export default function Login() {
             className="w-full bg-[#0a66c2] hover:bg-[#004182] disabled:bg-gray-300 text-white font-semibold rounded-full py-2.5 text-sm"
             data-testid="login-submit"
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? (slowConn ? 'جاري الاتصال بالخادم…' : 'Signing in…') : 'Sign in'}
           </button>
+          {slowConn && (
+            <p className="text-xs text-center text-gray-500 mt-1">قد يستغرق الاتصال لحظة إذا كان الخادم في وضع السكون</p>
+          )}
         </form>
         <div className="flex items-center my-5 text-xs text-gray-500">
           <div className="flex-1 border-t border-gray-300" />
