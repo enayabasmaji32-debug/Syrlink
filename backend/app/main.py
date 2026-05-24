@@ -34,12 +34,6 @@ app = FastAPI(title="SyrLink API", version="1.0.0")
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 
-# Serve frontend build if it exists
-ROOT_DIR = Path(__file__).resolve().parents[2]
-FRONTEND_BUILD_DIR = ROOT_DIR / "frontend" / "build"
-if FRONTEND_BUILD_DIR.exists():
-    app.mount("/", StaticFiles(directory=FRONTEND_BUILD_DIR, html=True), name="frontend")
-
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -75,6 +69,12 @@ app.include_router(endorsements_router, prefix=api_prefix)
 app.include_router(position_requests_router, prefix=api_prefix)
 app.include_router(util_router, prefix=api_prefix)
 app.include_router(websocket_router, prefix=api_prefix)
+
+# Serve frontend build if it exists — mounted LAST so API routes take priority
+ROOT_DIR = Path(__file__).resolve().parents[2]
+FRONTEND_BUILD_DIR = ROOT_DIR / "frontend" / "build"
+if FRONTEND_BUILD_DIR.exists():
+    app.mount("/", StaticFiles(directory=FRONTEND_BUILD_DIR, html=True), name="frontend")
 
 
 @app.on_event("startup")
