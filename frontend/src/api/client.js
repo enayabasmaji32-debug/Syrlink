@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const baseURL = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const rawBaseURL = process.env.REACT_APP_BACKEND_URL || '';
+const baseURL = `${rawBaseURL.replace(/\/$/, '')}/api`;
 
 const getCookie = (name) => {
   if (typeof document === 'undefined') return '';

@@ -1,10 +1,13 @@
 """Main FastAPI application."""
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app.config import CORS_ORIGINS, log, ADMIN_EMAIL, ADMIN_PASSWORD
 from app.database import client
@@ -30,6 +33,12 @@ from app.database import db
 app = FastAPI(title="SyrLink API", version="1.0.0")
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
+
+# Serve frontend build if it exists
+ROOT_DIR = Path(__file__).resolve().parents[2]
+FRONTEND_BUILD_DIR = ROOT_DIR / "frontend" / "build"
+if FRONTEND_BUILD_DIR.exists():
+    app.mount("/", StaticFiles(directory=FRONTEND_BUILD_DIR, html=True), name="frontend")
 
 # Add CORS middleware
 app.add_middleware(
