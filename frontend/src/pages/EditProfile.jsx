@@ -21,6 +21,7 @@ export default function EditProfile() {
     name: '',
     headline: '',
     location: '',
+    github: '',
     about: '',
     avatar: '',
     cover: '',
@@ -40,6 +41,7 @@ export default function EditProfile() {
         name: user.name || '',
         headline: user.headline || '',
         location: user.location || '',
+        github: user.github || '',
         about: user.about || '',
         avatar: user.avatar || '',
         cover: user.cover || '',
@@ -281,6 +283,17 @@ export default function EditProfile() {
                   placeholder="City, Country"
                   className="w-full"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">GitHub profile</label>
+                <Input
+                  name="github"
+                  value={formData.github}
+                  onChange={handleChange}
+                  placeholder="https://github.com/username"
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">Add your GitHub URL to share your public work.</p>
               </div>
             </div>
           </Card>

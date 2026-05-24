@@ -41,6 +41,7 @@ class UserPublic(BaseModel):
     headline: Optional[str] = ""
     location: Optional[str] = ""
     about: Optional[str] = ""
+    github: Optional[str] = None
     verified: bool = False
     experience: List[ExperienceItem] = []
     education: List[EducationItem] = []
@@ -83,6 +84,7 @@ class UserUpdateIn(BaseModel):
     avatar: Optional[str] = None
     cover: Optional[str] = None
     cv: Optional[str] = None
+    github: Optional[str] = None
     skills: Optional[List[str]] = None
     languages: Optional[List[str]] = None
     experience: Optional[List[ExperienceItem]] = None

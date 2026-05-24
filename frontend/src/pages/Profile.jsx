@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import ReportModal from '../components/ReportModal';
+import VerificationRequest from '../components/VerificationRequest';
 import { RecommendationsSection, EndorsementsSection } from '../components/ProfessionalSections';
 import { usersApi } from '../api';
 import { showImageLightbox } from '../components/ui/ImageLightbox';
@@ -40,6 +41,7 @@ export default function Profile() {
   const { user: me, connections, pendingSent, sendConnect, people } = useApp();
   const [fetched, setFetched] = useState(null);
   const [showReport, setShowReport] = useState(false);
+  const [verifOpen, setVerifOpen] = useState(false);
 
   const isMe = !userId || userId === 'me' || userId === me?.id;
   useEffect(() => {
@@ -288,6 +290,7 @@ export default function Profile() {
         </div>
       </div>
 
+      {verifOpen && <VerificationRequest onClose={() => setVerifOpen(false)} />}
       <ReportModal
         isOpen={showReport}
         onClose={() => setShowReport(false)}
