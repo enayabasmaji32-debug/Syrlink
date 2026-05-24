@@ -1,7 +1,5 @@
 """Authentication routes."""
-from fastapi import APIRouter, HTTPException, Depends, status, Request
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from fastapi import APIRouter, HTTPException, Depends, status
 import resend
 import time
 
@@ -14,7 +12,6 @@ from app.database import db
 from app.config import APP_URL, RESEND_FROM, log
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/register")
@@ -72,8 +69,7 @@ async def register(data: RegisterIn):
 
 
 @router.post("/login")
-@limiter.limit("5/minute")
-async def login(request: Request, data: LoginIn):
+async def login(data: LoginIn):
     """Login a user."""
     start_time = time.time()
     email = data.email.lower()
