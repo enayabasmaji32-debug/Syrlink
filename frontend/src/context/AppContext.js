@@ -50,12 +50,7 @@ export function AppProvider({ children }) {
   // On mount: try to restore session - NON-BLOCKING
   useEffect(() => {
     const storedConsent = getCookie('li_cookie_consent') === 'yes';
-    const storedToken = localStorage.getItem('li_token') || getCookie('li_token');
-
-    if (!storedToken) {
-      setAuthReady(true);
-      return;
-    }
+    const storedToken = localStorage.getItem('li_token');
 
     if (!storedConsent) {
       localStorage.removeItem('li_token');
@@ -64,18 +59,21 @@ export function AppProvider({ children }) {
       return;
     }
 
-    setToken(storedToken);
-    // Immediately render with token, validate in background
-    setAuthReady(true);
-    
-    // Validate token asynchronously (don't block UI)
+    if (storedToken) {
+      setToken(storedToken);
+    }
+
     authApi.me()
-      .then(setUser)
+      .then((me) => {
+        setUser(me);
+        setAuthReady(true);
+      })
       .catch(() => {
         localStorage.removeItem('li_token');
         eraseCookie('li_token');
         setToken(null);
         setUser(null);
+        setAuthReady(true);
       });
   }, []);
 
@@ -177,11 +175,9 @@ export function AppProvider({ children }) {
   const login = async (email, password) => {
     const { token, user: u } = await authApi.login({ email, password });
     localStorage.setItem('li_token', token);
-    setCookie('li_token', token);
     setCookie('li_cookie_consent', 'yes', { maxAge: 31536000 });
     setToken(token);
     setUser(u);
-    // Delay loading data to let UI render first, but use the current user directly
     setTimeout(() => {
       refreshAll(u);
       loadOwnedCompanies(u);
@@ -192,7 +188,6 @@ export function AppProvider({ children }) {
   const register = async (data) => {
     const { token, user: u } = await authApi.register(data);
     localStorage.setItem('li_token', token);
-    setCookie('li_token', token);
     setCookie('li_cookie_consent', 'yes', { maxAge: 31536000 });
     setToken(token);
     setUser(u);
@@ -203,7 +198,12 @@ export function AppProvider({ children }) {
     return u;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch (err) {
+      console.warn('Logout request failed, clearing local session anyway', err);
+    }
     localStorage.removeItem('li_token');
     localStorage.removeItem('li_active_company');
     eraseCookie('li_token');

@@ -28,7 +28,7 @@ def iso(dt: datetime) -> str:
 
 
 SYRIAN_USERS = [
-    {"name": "Ahmad Al-Halabi", "headline": "Senior Software Engineer | React & Node.js | Damascus", "location": "Damascus, Syria", "avatar": "https://images.unsplash.com/photo-1560250097-0b93528c311a", "cover": "https://images.unsplash.com/photo-1497215728101-856f4ea42174", "verified": True, "skills": ["React", "Node.js", "TypeScript", "AWS", "MongoDB"], "languages": ["Arabic (Native)", "English (Fluent)", "French (Conversational)"]},
+    {"name": "Ahmad Al-Halabi", "headline": "Senior Software Engineer | React & Node.js | Damascus", "location": "Damascus, Syria", "avatar": "https://images.unsplash.com/photo-1560250097-0b93528c311a", "cover": "https://images.unsplash.com/photo-1497215728101-856f4ea42174", "verified": True, "skills": ["React", "Node.js", "TypeScript", "AWS", "MongoDB"], "languages": ["Arabic (Native)", "English (Fluent)", "French (Conversational)"], "github": "https://github.com/ahmad-halabi"},
     {"name": "Layla Al-Damashqi", "headline": "Product Manager @ SyrTech | Ex-Google", "location": "Aleppo, Syria", "avatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2", "cover": "https://images.unsplash.com/photo-1497366811353-6870744d04b2", "verified": True, "skills": ["Product Strategy", "Roadmapping", "Analytics", "Agile"], "languages": ["Arabic (Native)", "English (Fluent)"]},
     {"name": "Omar Al-Shami", "headline": "Staff Engineer @ Levant Pay · Distributed Systems", "location": "Damascus, Syria", "avatar": "https://images.unsplash.com/photo-1629425733761-caae3b5f2e50", "cover": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab", "verified": False, "skills": ["Go", "Kubernetes", "Postgres", "Distributed Systems"], "languages": ["Arabic (Native)", "English (Fluent)"]},
     {"name": "Rama Khaddour", "headline": "UX Designer | Crafting human-centered experiences", "location": "Latakia, Syria", "avatar": "https://images.pexels.com/photos/37148308/pexels-photo-37148308.jpeg", "cover": "https://images.unsplash.com/photo-1497366754035-f200968a6e72", "verified": False, "skills": ["Figma", "Prototyping", "Design Systems", "User Research"], "languages": ["Arabic (Native)", "English (Fluent)"]},
@@ -74,6 +74,7 @@ async def run_seed(db):
         "email": "demo@syrlink.com",
         "password_hash": hash_pwd("demo1234"),
         "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde",
+        "github": "https://github.com/demo-syrlink",
         "cover": "https://images.unsplash.com/photo-1497215728101-856f4ea42174",
         "headline": "Software Engineer | Open to opportunities in the Levant",
         "location": "Damascus, Syria",
@@ -111,6 +112,7 @@ async def run_seed(db):
             "languages": u["languages"],
             "connections": 100 + (hash(u["name"]) % 500),
             "created_at": iso(datetime.now(timezone.utc) - timedelta(days=120 + (hash(u["name"]) % 200))),
+            **({"github": u["github"]} if u.get("github") else {}),
         })
 
     await db.users.insert_many(users)

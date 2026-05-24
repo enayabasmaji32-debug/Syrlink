@@ -1,7 +1,10 @@
 """Authentication routes."""
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Request, Response
+from fastapi.responses import JSONResponse, RedirectResponse
 import resend
 import time
+import httpx
+from urllib.parse import urlencode
 
 from app.models import (
     RegisterIn, LoginIn, VerifyEmailIn, ForgotPasswordIn, ResetPasswordIn
@@ -9,7 +12,7 @@ from app.models import (
 from app.security import hash_password, verify_password, create_token, get_current_user
 from app.utils import uid, now_iso
 from app.database import db
-from app.config import APP_URL, RESEND_FROM, log
+from app.config import APP_URL, RESEND_FROM, log, JWT_COOKIE_NAME, JWT_COOKIE_MAX_AGE, COOKIE_SECURE
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -65,7 +68,17 @@ async def register(data: RegisterIn):
     
     token = create_token(user_id, email)
     user_out = {k: v for k, v in doc.items() if k not in ("password_hash", "_id", "verify_token")}
-    return {"token": token, "user": user_out}
+    response = JSONResponse({"token": token, "user": user_out})
+    response.set_cookie(
+        key=JWT_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=JWT_COOKIE_MAX_AGE,
+        path="/",
+    )
+    return response
 
 
 @router.post("/login")
@@ -114,7 +127,17 @@ async def login(data: LoginIn):
 
     user.pop("_id", None)
     user.pop("password_hash", None)
-    return {"token": token, "user": user}
+    response = JSONResponse({"token": token, "user": user})
+    response.set_cookie(
+        key=JWT_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=JWT_COOKIE_MAX_AGE,
+        path="/",
+    )
+    return response
 
 
 @router.get("/me")
@@ -122,6 +145,116 @@ async def me(current=Depends(get_current_user)):
     """Get current user profile (slim version for fast loading)."""
     # Return slim user from token - UI loads full profile from /users/{id} when needed
     return current
+
+
+@router.post("/logout")
+async def logout() -> JSONResponse:
+    """Clear the auth cookie and log the user out."""
+    response = JSONResponse({"ok": True})
+    response.delete_cookie(
+        key=JWT_COOKIE_NAME,
+        path="/",
+    )
+    return response
+
+
+@router.get("/google/login")
+async def google_login():
+    if not GOOGLE_CLIENT_ID or not GOOGLE_OAUTH_REDIRECT:
+        raise HTTPException(status_code=500, detail="Google OAuth is not configured")
+
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": GOOGLE_OAUTH_REDIRECT,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "select_account",
+    }
+    return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}")
+
+
+@router.get("/google/callback")
+async def google_callback(code: str | None = None, response: Response | None = None):
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing Google authorization code")
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET or not GOOGLE_OAUTH_REDIRECT:
+        raise HTTPException(status_code=500, detail="Google OAuth is not configured")
+
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": GOOGLE_OAUTH_REDIRECT,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=20,
+        )
+        if token_resp.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to exchange Google code")
+        token_data = token_resp.json()
+
+        userinfo_resp = await client.get(
+            "https://openidconnect.googleapis.com/v1/userinfo",
+            headers={"Authorization": f"Bearer {token_data['access_token']}"},
+            timeout=20,
+        )
+        if userinfo_resp.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to fetch Google user info")
+        google_user = userinfo_resp.json()
+
+    email = google_user.get("email")
+    if not email or not google_user.get("email_verified"):
+        raise HTTPException(status_code=400, detail="Google account email is required and must be verified")
+
+    user = await db.users.find_one({"email": email.lower()})
+    if not user:
+        user_id = uid()
+        user = {
+            "id": user_id,
+            "name": google_user.get("name", "Unnamed User"),
+            "email": email.lower(),
+            "password_hash": "",
+            "avatar": google_user.get("picture", f"https://api.dicebear.com/7.x/initials/svg?seed={google_user.get('name', 'user')}"),
+            "cover": "https://images.unsplash.com/photo-1497215728101-856f4ea42174",
+            "headline": "",
+            "location": google_user.get("locale", ""),
+            "about": "",
+            "verified": False,
+            "email_verified": True,
+            "verify_token": "",
+            "experience": [],
+            "education": [],
+            "skills": [],
+            "languages": [],
+            "connections": 0,
+            "created_at": now_iso(),
+            "last_seen": now_iso(),
+        }
+        await db.users.insert_one(user)
+    else:
+        await db.users.update_one({"id": user["id"]}, {"$set": {"last_seen": now_iso(), "email_verified": True}})
+
+    token = create_token(user["id"], email.lower())
+    user.pop("_id", None)
+    user.pop("password_hash", None)
+
+    redirect_target = APP_URL or "/"
+    response = RedirectResponse(url=redirect_target)
+    response.set_cookie(
+        key=JWT_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=JWT_COOKIE_MAX_AGE,
+        path="/",
+    )
+    return response
 
 
 @router.post("/verify-email")

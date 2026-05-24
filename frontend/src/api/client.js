@@ -3,15 +3,10 @@ import axios from 'axios';
 const rawBaseURL = process.env.REACT_APP_BACKEND_URL || '';
 const baseURL = `${rawBaseURL.replace(/\/$/, '')}/api`;
 
-const getCookie = (name) => {
-  if (typeof document === 'undefined') return '';
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : '';
-};
-
 const client = axios.create({ 
   baseURL,
   timeout: 300000, // 5 minutes timeout for heavy operations
+  withCredentials: true,
 });
 
 // Retry configuration
@@ -19,7 +14,7 @@ const MAX_RETRIES = 3;
 let retryCount = {};
 
 client.interceptors.request.use((config) => {
-  const token = localStorage.getItem('li_token') || getCookie('li_token');
+  const token = localStorage.getItem('li_token');
   if (token) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;

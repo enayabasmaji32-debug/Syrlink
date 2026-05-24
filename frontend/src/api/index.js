@@ -4,6 +4,8 @@ export const authApi = {
   register: (d) => c.post('/auth/register', d).then((r) => r.data),
   login: (d) => c.post('/auth/login', d).then((r) => r.data),
   me: () => c.get('/auth/me').then((r) => r.data),
+  logout: () => c.post('/auth/logout').then((r) => r.data),
+  googleLoginUrl: () => `${process.env.REACT_APP_BACKEND_URL || ''}/api/auth/google/login`,
 };
 
 export const usersApi = {

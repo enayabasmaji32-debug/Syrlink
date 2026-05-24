@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { authApi } from '../api';
 import { toast } from 'sonner';
 
 function fmtErr(d) {
@@ -120,6 +121,20 @@ export default function Login() {
           >
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
+          <a
+            href={cookieConsent ? authApi.googleLoginUrl() : '#'}
+            onClick={(e) => {
+              if (!cookieConsent) {
+                e.preventDefault();
+                setErr('يرجى الموافقة على الكوكيز قبل تسجيل الدخول');
+                setShowCookieModal(true);
+              }
+            }}
+            className="w-full inline-flex items-center justify-center gap-2 mt-3 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-full py-2 text-sm"
+            rel="noopener noreferrer"
+          >
+            Continue with Google
+          </a>
         </form>
         <div className="flex items-center my-5 text-xs text-gray-500">
           <div className="flex-1 border-t border-gray-300" />

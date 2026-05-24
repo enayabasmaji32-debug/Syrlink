@@ -1,14 +1,14 @@
 """Security utilities: password hashing, JWT, auth dependencies."""
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
-from fastapi import HTTPException, Depends, status
+from fastapi import HTTPException, Depends, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import bcrypt
 import jwt
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 
-from app.config import JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRY_MIN, log
+from app.config import JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRY_MIN, JWT_COOKIE_NAME, log
 from app.database import db
 
 security = HTTPBearer(auto_error=False)
@@ -48,17 +48,43 @@ def create_token(user_id: str, email: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-async def get_current_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Dict[str, Any]:
-    """Get the current authenticated user from JWT token."""
-    if not creds or not creds.credentials:
+async def get_current_user(
+    request: Request,
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Dict[str, Any]:
+    """Get the current authenticated user from JWT token.
+
+    Preference order: Authorization bearer header, then httpOnly cookie.
+    """
+    bearer_token = creds.credentials if creds and creds.credentials else None
+    cookie_token = request.cookies.get(JWT_COOKIE_NAME) if JWT_COOKIE_NAME in request.cookies else None
+    token = bearer_token or cookie_token
+
+    if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    token = creds.credentials
+
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+        if bearer_token and cookie_token and bearer_token != cookie_token:
+            try:
+                payload = jwt.decode(cookie_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            except jwt.ExpiredSignatureError:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+            except jwt.InvalidTokenError:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        else:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        if bearer_token and cookie_token and bearer_token != cookie_token:
+            try:
+                payload = jwt.decode(cookie_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            except jwt.ExpiredSignatureError:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+            except jwt.InvalidTokenError:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        else:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     
     # Slim projection: skip heavy fields (cover/about/experience/education) on every
     # authenticated request. Legacy users may have base64-encoded avatars/covers

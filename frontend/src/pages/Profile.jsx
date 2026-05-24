@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Camera,
@@ -18,10 +18,8 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import VerificationRequest from '../components/VerificationRequest';
 import ReportModal from '../components/ReportModal';
 import { RecommendationsSection, EndorsementsSection } from '../components/ProfessionalSections';
-import { useEffect, useState } from 'react';
 import { usersApi } from '../api';
 import { showImageLightbox } from '../components/ui/ImageLightbox';
 
@@ -41,7 +39,6 @@ export default function Profile() {
   const { userId } = useParams();
   const { user: me, connections, pendingSent, sendConnect, people } = useApp();
   const [fetched, setFetched] = useState(null);
-  const [verifOpen, setVerifOpen] = useState(false);
   const [showReport, setShowReport] = useState(false);
 
   const isMe = !userId || userId === 'me' || userId === me?.id;
@@ -97,6 +94,13 @@ export default function Profile() {
                 <MapPin className="w-3.5 h-3.5" /> {profile.location || 'Syria'} ·
                 <span className="text-[#0a66c2] font-semibold hover:underline cursor-pointer ml-1">Contact info</span>
               </p>
+              {profile.github && (
+                <p className="text-sm text-[#0a66c2] mt-1">
+                  <a href={profile.github} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                    GitHub profile
+                  </a>
+                </p>
+              )}
               <p className="text-sm font-semibold text-[#0a66c2] mt-1 hover:underline cursor-pointer">
                 {profile.connections || 0}+ connections</p>
               {isMe && !profile.verified && (
