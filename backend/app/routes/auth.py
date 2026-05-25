@@ -175,7 +175,7 @@ async def google_login():
 
 
 @router.get("/google/callback")
-async def google_callback(code: str | None = None, response: Response | None = None):
+async def google_callback(code: str | None = None):
     if not code:
         raise HTTPException(status_code=400, detail="Missing Google authorization code")
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET or not GOOGLE_OAUTH_REDIRECT:
