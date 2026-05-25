@@ -49,6 +49,21 @@ app.add_middleware(
 async def rate_limit_handler(request, exc):
     return JSONResponse(status_code=429, content={"detail": "Too many requests. Please try again later."})
 
+# MongoDB connection error handler
+from pymongo.errors import AutoReconnect
+import asyncio
+
+@app.exception_handler(AutoReconnect)
+async def mongodb_reconnect_handler(request, exc):
+    """Handle MongoDB reconnection errors by retrying once."""
+    log.warning(f"MongoDB connection lost, will retry: {exc}")
+    # Give the connection pool a moment to recover
+    await asyncio.sleep(1)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Database temporarily unavailable. Please try again."}
+    )
+
 # Register routers with /api prefix
 api_prefix = "/api"
 app.include_router(auth_router, prefix=api_prefix)
