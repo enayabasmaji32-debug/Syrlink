@@ -9,15 +9,14 @@ from app.config import MONGO_URL, DB_NAME, CLOUDINARY_CLOUD_NAME, CLOUDINARY_API
 # MongoDB connection with optimized settings
 client = AsyncIOMotorClient(
     MONGO_URL,
-    serverSelectionTimeoutMS=60000,  # 60 second timeout for server selection (increased from 30)
-    connectTimeoutMS=60000,           # 60 second timeout for connection (increased from 30)
-    socketTimeoutMS=60000,            # 60 second timeout for socket operations (increased from 30)
-    maxPoolSize=100,                  # Connection pool size (increased from 50)
+    serverSelectionTimeoutMS=60000,  # 60 second timeout for server selection
+    connectTimeoutMS=60000,           # 60 second timeout for connection
+    socketTimeoutMS=60000,            # 60 second timeout for socket operations
+    maxPoolSize=100,                  # Connection pool size
     minPoolSize=10,                   # Minimum pool size for better concurrency
     retryWrites=True,
     w='majority',
     heartbeatFrequencyMS=10000,       # Heartbeat every 10 seconds to detect failures faster
-    serverMonitoringMode='stream',    # Use streaming to detect server changes faster
 )
 db: AsyncIOMotorDatabase = client[DB_NAME]
 
