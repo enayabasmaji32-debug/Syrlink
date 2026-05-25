@@ -140,11 +140,11 @@ const PostCardComponent = ({ post }) => {
       <article className="li-card overflow-hidden">
       {/* Header */}
       <div className="flex items-start gap-2 p-3 pb-2">
-        <Link to={post.company_id ? `/company/${post.author.id}` : `/in/${post.author.id}`} className="shrink-0">
+        <Link to={post.company_id ? `/company/${post.company_id}` : `/in/${post.author.id}`} className="shrink-0">
           <img src={post.author.avatar} alt={post.author.name} className="w-12 h-12 rounded-full object-cover" />
         </Link>
         <div className="min-w-0 flex-1">
-          <Link to={post.company_id ? `/company/${post.author.id}` : `/in/${post.author.id}`} className="text-sm font-semibold hover:text-[#0a66c2] hover:underline inline-flex items-center gap-1">
+          <Link to={post.company_id ? `/company/${post.company_id}` : `/in/${post.author.id}`} className="text-sm font-semibold hover:text-[#0a66c2] hover:underline inline-flex items-center gap-1">
             <span translate="no">{post.author?.name || ''}</span>
             {post.author?.verified ? <CheckCircle2 className="w-4 h-4 text-[#0a66c2]" fill="#0a66c2" stroke="white" /> : null}
             <span className="text-xs text-gray-500 font-normal">· 1st</span>

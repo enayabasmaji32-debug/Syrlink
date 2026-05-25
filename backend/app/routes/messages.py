@@ -145,7 +145,16 @@ async def start_conversation(data: ConversationIn, current=Depends(get_current_u
     existing = await db.conversations.find_one({"participants": {"$all": [current["id"], data.user_id]}})
     if existing:
         existing.pop("_id", None)
-        return existing
+        # Get user info for existing conversation too
+        user = await fetch_user_brief(data.user_id)
+        return {
+            "id": existing["id"],
+            "user": user,
+            "lastMessage": existing.get("last_message", ""),
+            "timeAgo": time_ago(existing.get("last_message_at", now_iso())),
+            "unread": False,
+            "online": is_user_online(user.get("last_seen", "")),
+        }
     
     doc = {
         "id": uid(),
@@ -155,5 +164,14 @@ async def start_conversation(data: ConversationIn, current=Depends(get_current_u
         "created_at": now_iso(),
     }
     await db.conversations.insert_one(doc)
-    doc.pop("_id", None)
-    return doc
+    
+    # Return with user info
+    user = await fetch_user_brief(data.user_id)
+    return {
+        "id": doc["id"],
+        "user": user,
+        "lastMessage": "",
+        "timeAgo": "now",
+        "unread": False,
+        "online": is_user_online(user.get("last_seen", "")),
+    }

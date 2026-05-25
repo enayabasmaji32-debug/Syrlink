@@ -14,8 +14,8 @@ function fmtErr(d) {
 export default function Login() {
   const { login, user, authReady } = useApp();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('demo@syrlink.com');
-  const [password, setPassword] = useState('demo1234');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [cookieConsent, setCookieConsent] = useState(false);

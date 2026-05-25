@@ -33,15 +33,6 @@ async def admin_suspend_user(user_id: str, data: SuspendUserIn, admin=Depends(re
         target_id=user_id,
     )
     return {"ok": True, "suspended": True}
-from app.security import get_current_user, require_admin
-from app.utils import uid, now_iso, create_notification, fetch_user_brief
-from app.database import db
-from app.config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
-import cloudinary.utils
-import os
-
-# Verification router
-verification_router = APIRouter(prefix="/verification", tags=["verification"])
 
 
 @verification_router.post("/request")
@@ -74,10 +65,6 @@ async def my_verification(current=Depends(get_current_user)):
         {"user_id": current["id"]}, {"_id": 0}, sort=[("created_at", -1)]
     )
     return req or {"status": "none"}
-
-
-# Admin router
-admin_router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 @admin_router.get("/stats")

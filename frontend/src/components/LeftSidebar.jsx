@@ -24,11 +24,11 @@ export default function LeftSidebar() {
         <div className="px-4 py-2 border-t border-[#e0dfdc] text-xs space-y-1">
           <div className="flex justify-between hover:bg-gray-100 rounded px-1 py-1 cursor-pointer">
             <span className="text-gray-600">Profile viewers</span>
-            <span className="font-semibold text-[#0a66c2]">142</span>
+            <span className="font-semibold text-[#0a66c2]">—</span>
           </div>
           <div className="flex justify-between hover:bg-gray-100 rounded px-1 py-1 cursor-pointer">
             <span className="text-gray-600">Post impressions</span>
-            <span className="font-semibold text-[#0a66c2]">3,287</span>
+            <span className="font-semibold text-[#0a66c2]">—</span>
           </div>
         </div>
         <div className="px-4 py-2 border-t border-[#e0dfdc]">
@@ -42,14 +42,14 @@ export default function LeftSidebar() {
       </div>
 
       <div className="li-card p-3 text-xs">
-        <Link to="/mynetwork" className="flex items-center justify-between px-1 py-1 text-gray-600 hover:text-[#0a66c2] font-semibold">
+        <Link to="/groups" className="flex items-center justify-between px-1 py-1 text-gray-600 hover:text-[#0a66c2] font-semibold">
           <span className="flex items-center gap-2"><Users className="w-4 h-4" /> Groups</span>
         </Link>
-        <Link to="/mynetwork" className="flex items-center justify-between px-1 py-1 text-gray-600 hover:text-[#0a66c2] font-semibold mt-1">
+        <Link to="/events" className="flex items-center justify-between px-1 py-1 text-gray-600 hover:text-[#0a66c2] font-semibold mt-1">
           <span className="flex items-center gap-2"><Hash className="w-4 h-4" /> Events</span>
           <Plus className="w-4 h-4" />
         </Link>
-        <Link to="/mynetwork" className="flex items-center justify-between px-1 py-1 text-gray-600 hover:text-[#0a66c2] font-semibold mt-1">
+        <Link to="/hashtags" className="flex items-center justify-between px-1 py-1 text-gray-600 hover:text-[#0a66c2] font-semibold mt-1">
           <span className="flex items-center gap-2"><Hash className="w-4 h-4" /> Followed Hashtags</span>
         </Link>
         <Link to="/position-requests" className="flex items-center justify-between px-1 py-1 text-gray-600 hover:text-[#0a66c2] font-semibold mt-1">

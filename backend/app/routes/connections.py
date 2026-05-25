@@ -14,20 +14,20 @@ router = APIRouter(prefix="/connections", tags=["connections"])
 async def batch_fetch_users(user_ids: List[str]) -> Dict[str, Dict[str, Any]]:
     """Batch fetch multiple users to avoid N+1 queries."""
     unique_ids = list(set(user_ids))
-    log.info(f"[batch_fetch_users] Fetching {len(unique_ids)} unique users: {unique_ids}")
+    log.info(f"[batch_fetch_users] Fetching {len(unique_ids)} unique users")
     
     users = await db.users.find(
         {"id": {"$in": unique_ids}}, 
         {"_id": 0, "id": 1, "name": 1, "avatar": 1, "headline": 1}
     ).to_list(len(unique_ids))
     
-    log.info(f"[batch_fetch_users] Found {len(users)} users in DB: {users}")
+    log.debug(f"[batch_fetch_users] Found {len(users)} users in DB")
     
     user_map = {u["id"]: u for u in users}
     # Add defaults for missing users
     for _uid in unique_ids:
         if _uid not in user_map:
-            log.warning(f"[batch_fetch_users] User {_uid} not found, using Unknown")
+            log.warning(f"[batch_fetch_users] User not found, using Unknown")
             user_map[_uid] = {"id": _uid, "name": "Unknown", "avatar": "", "headline": ""}
     return user_map
 
@@ -35,26 +35,23 @@ async def batch_fetch_users(user_ids: List[str]) -> Dict[str, Dict[str, Any]]:
 @router.get("/invitations")
 async def list_invitations(current=Depends(get_current_user)):
     """List pending connection requests for the current user."""
-    log.info(f"[/invitations] Fetching invitations for user: {current['id']}")
+    log.info("[/invitations] Fetching pending invitations")
     
     # Get pending invitations
     invs = await db.connections.find(
         {"receiver_id": current["id"], "status": "pending"}, {"_id": 0}
     ).sort("created_at", -1).limit(50).to_list(50)
     
-    log.info(f"[/invitations] Found {len(invs)} invitations: {invs}")
+    log.info(f"[/invitations] Found {len(invs)} invitations")
     
     if not invs:
         return []
     
     # Batch fetch all requester users
     requester_ids = [inv["requester_id"] for inv in invs]
-    log.info(f"[/invitations] Requester IDs to fetch: {requester_ids}")
+    log.debug(f"[/invitations] Fetching {len(requester_ids)} requester profiles")
     
     user_map = await batch_fetch_users(requester_ids)
-    
-    # Debug log
-    log.info(f"[/invitations] User map result: {user_map}")
     
     # Get current user's connections for mutual count calculation
     current_conns = await db.connections.find(

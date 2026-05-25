@@ -9,14 +9,20 @@ export default function Messaging() {
   const { userId } = useParams();
   const { conversations, sendMessage, user, loadThread } = useApp();
   const [activeId, setActiveId] = useState(null);
+  const [localConversations, setLocalConversations] = useState([]);
   const [text, setText] = useState('');
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // When userId param changes, find or create conversation
+  // Sync local state with global conversations
+  React.useEffect(() => {
+    setLocalConversations(conversations);
+  }, [conversations]);
+
+  // When userId param changes, find or create conversation - SEPARATED from localConversations dependency
   React.useEffect(() => {
     if (userId) {
-      // Try to find existing conversation with this user
+      // Try to find existing conversation with this user using the global conversations
       const existing = conversations.find((c) => c.user?.id === userId || c.other_user_id === userId);
       if (existing) {
         setActiveId(existing.id);
@@ -25,19 +31,9 @@ export default function Messaging() {
         setLoading(true);
         messagesApi.start(userId)
           .then((conv) => {
-            // Reload conversations list to get updated data with user info
-            messagesApi.conversations()
-              .then((updatedConvs) => {
-                // Find the new conversation in updated list
-                const newConv = updatedConvs.find((c) => c.id === conv.id);
-                if (newConv) {
-                  setActiveId(newConv.id);
-                }
-              })
-              .catch(() => {
-                // Fallback: just use the returned conversation
-                setActiveId(conv.id);
-              });
+            // Immediately set the conversation as active since backend now returns full user info
+            setActiveId(conv.id);
+            console.log('[Messaging] New conversation created:', conv.id, 'with user:', conv.user?.id);
           })
           .catch((err) => {
             console.error('Failed to start conversation:', err);
@@ -49,19 +45,27 @@ export default function Messaging() {
       // Default to first conversation if no userId specified
       setActiveId(conversations[0]?.id);
     }
-  }, [userId, conversations]);
+  }, [userId]); // Only depend on userId changes, not localConversations
 
   React.useEffect(() => {
-    if (activeId) {
-      const conv = conversations.find((c) => c.id === activeId);
-      if (conv && !conv.thread) loadThread(activeId);
+    if (activeId && localConversations.length > 0) {
+      const conv = localConversations.find((c) => c.id === activeId);
+      if (conv && !conv.thread) {
+        loadThread(activeId);
+      }
     }
-    // eslint-disable-next-line
-  }, [activeId]);
+  }, [activeId, localConversations]);
 
-  const active = conversations.find((c) => c.id === activeId) || conversations[0];
+  // Get the active conversation - if activeId is set but not found, use a placeholder instead of defaulting to first
+  const active = localConversations.find((c) => c.id === activeId);
+  
+  if (!active && activeId && localConversations.length > 0) {
+    // This handles the case where activeId is set but conversation isn't in the list yet
+    // (e.g., newly created conversation that haven't been synced back from server)
+    console.log('[Messaging] Active conversation with ID', activeId, 'not found in list, may still be loading');
+  }
 
-  const filtered = conversations.filter((c) => c.user.name.toLowerCase().includes(q.toLowerCase()));
+  const filtered = localConversations.filter((c) => c.user?.name?.toLowerCase().includes(q.toLowerCase()));
 
   const submit = async () => {
     const t = text.trim();

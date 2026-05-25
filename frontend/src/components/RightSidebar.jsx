@@ -5,11 +5,8 @@ import { newsApi } from '../api';
 export default function RightSidebar() {
   const [news, setNews] = useState([]);
   useEffect(() => {
-    // Delay news loading to after main content is rendered
-    const timer = setTimeout(() => {
-      newsApi.list().then(setNews).catch(() => setNews([]));
-    }, 2000);
-    return () => clearTimeout(timer);
+    // Load news without unnecessary delay
+    newsApi.list().then(setNews).catch(() => setNews([]));
   }, []);
 
   return (
@@ -44,9 +41,9 @@ export default function RightSidebar() {
       </div>
 
       <div className="li-card p-3 text-center text-xs text-gray-500">
-        <button className="inline-flex items-center gap-1 hover:bg-gray-100 rounded px-2 py-1 font-semibold text-gray-600">
+        <a href="https://business.syrlink.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:bg-gray-100 rounded px-2 py-1 font-semibold text-gray-600">
           <Plus className="w-3 h-3" /> Promote your business
-        </button>
+        </a>
       </div>
     </aside>
   );

@@ -15,7 +15,7 @@ export default function Network() {
           <h2 className="font-semibold mb-2">Manage my network</h2>
           <ul className="space-y-1">
             {[
-              { icon: Users, label: 'Connections', count: (connections?.size || 0) + 487 },
+              { icon: Users, label: 'Connections', count: connections?.size || 0 },
               { icon: UserPlus, label: 'Following & followers', count: 1024 },
               { icon: Users, label: 'Groups', count: 12 },
               { icon: Calendar, label: 'Events', count: 4 },
@@ -40,7 +40,6 @@ export default function Network() {
         <section className="li-card p-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-base">Invitations ({invitations?.length || 0})</h2>
-            <Link to="#" className="text-sm font-semibold text-gray-600 hover:bg-gray-100 px-2 py-1 rounded">See all</Link>
           </div>
           <ul className="divide-y divide-gray-100 mt-2">
             {(!invitations || invitations.length === 0) && (

@@ -117,8 +117,8 @@ export default function Profile() {
                     <Link to="/me/edit" className="bg-[#0a66c2] hover:bg-[#004182] text-white font-semibold text-sm rounded-full px-4 py-1.5 flex items-center gap-1">
                       <Pencil className="w-4 h-4" /> Edit profile
                     </Link>
-                    <button className="border border-gray-700 text-gray-700 hover:bg-gray-100 font-semibold text-sm rounded-full px-4 py-1.5">Open to</button>
-                    <button className="border border-gray-500 text-gray-700 hover:bg-gray-100 font-semibold text-sm rounded-full px-4 py-1.5">Resources</button>
+                    <Link to="/career-interests" className="border border-gray-700 text-gray-700 hover:bg-gray-100 font-semibold text-sm rounded-full px-4 py-1.5">Open to</Link>
+                    <a href="https://help.syrlink.com" target="_blank" rel="noopener noreferrer" className="border border-gray-500 text-gray-700 hover:bg-gray-100 font-semibold text-sm rounded-full px-4 py-1.5">Resources</a>
                   </>
                 ) : (
                   <>
@@ -140,7 +140,7 @@ export default function Profile() {
                     <Link to={`/messaging/${profile.id}`} className="border border-[#0a66c2] text-[#0a66c2] hover:bg-[#0a66c2]/10 font-semibold text-sm rounded-full px-4 py-1.5 flex items-center gap-1">
                       <MessageSquare className="w-4 h-4" /> Message
                     </Link>
-                    <button className="border border-gray-700 text-gray-700 hover:bg-gray-100 font-semibold text-sm rounded-full px-4 py-1.5">More</button>
+                    <a href="#" className="border border-gray-700 text-gray-700 hover:bg-gray-100 font-semibold text-sm rounded-full px-4 py-1.5">More options</a>
                     <button onClick={() => setShowReport(true)} className="border border-red-500 text-red-600 hover:bg-red-50 font-semibold text-sm rounded-full px-4 py-1.5 flex items-center gap-1">
                       <AlertCircle className="w-4 h-4" /> Report
                     </button>
@@ -156,12 +156,12 @@ export default function Profile() {
           <Section title="Analytics" action={null}>
             <p className="text-xs text-gray-500 -mt-2 mb-3">Private to you</p>
             <div className="grid grid-cols-3 gap-3 text-sm">
-              <div><div className="font-semibold">142 profile views</div><div className="text-xs text-gray-600">Discover who's viewed your profile.</div></div>
-              <div><div className="font-semibold">3,287 post impressions</div><div className="text-xs text-gray-600">Past 7 days</div></div>
-              <div><div className="font-semibold">62 search appearances</div><div className="text-xs text-gray-600">Discover how often you appear in searches.</div></div>
+              <div><div className="font-semibold">{profile.profile_views || 0} profile views</div><div className="text-xs text-gray-600">Discover who's viewed your profile.</div></div>
+              <div><div className="font-semibold">{profile.post_impressions || 0} post impressions</div><div className="text-xs text-gray-600">Past 7 days</div></div>
+              <div><div className="font-semibold">{profile.search_appearances || 0} search appearances</div><div className="text-xs text-gray-600">Discover how often you appear in searches.</div></div>
             </div>
           </Section>
-        )}
+        )}}
 
         {/* About */}
         <Section title="About">

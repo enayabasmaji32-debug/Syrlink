@@ -1,103 +1,21 @@
-// Mock data for LinkedIn clone
+/**
+ * ⚠️ DEPRECATED: This file contains mock/test data and should NOT be used in production.
+ * 
+ * If you're seeing this file being imported, it's likely from legacy code.
+ * All data should come from the backend API endpoints:
+ * - /api/auth/me - Current user
+ * - /api/users/{id} - Other users  
+ * - /api/users/me/suggestions - User suggestions
+ * 
+ * To clean up: Remove imports of currentUser and peopleSeed from all components.
+ * This file will be deleted in the next release.
+ */
 
-export const currentUser = {
-  id: 'me',
-  name: 'Ahmed Hassan',
-  headline: 'Senior Software Engineer at TechCorp | Building scalable web applications | React & Node.js',
-  avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a',
-  cover: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174',
-  location: 'San Francisco Bay Area',
-  connections: 487,
-  verified: true,
-  about:
-    "Passionate software engineer with 8+ years of experience building scalable web applications. I love crafting elegant solutions to complex problems and mentoring junior developers. Currently focused on distributed systems, cloud architecture, and AI integrations.",
-  experience: [
-    {
-      id: 'e1',
-      title: 'Senior Software Engineer',
-      company: 'TechCorp',
-      logo: 'https://logo.clearbit.com/google.com',
-      type: 'Full-time',
-      duration: 'Jan 2022 - Present · 3 yrs',
-      location: 'San Francisco, CA',
-      description:
-        'Leading the front-end architecture migration to Next.js 14 and React Server Components. Mentoring 5 engineers.',
-    },
-    {
-      id: 'e2',
-      title: 'Software Engineer',
-      company: 'InnovateLabs',
-      logo: 'https://logo.clearbit.com/meta.com',
-      type: 'Full-time',
-      duration: 'Jun 2019 - Dec 2021 · 2 yrs 7 mos',
-      location: 'Remote',
-      description: 'Built real-time collaboration features for a SaaS product serving 1M+ users.',
-    },
-    {
-      id: 'e3',
-      title: 'Junior Developer',
-      company: 'StartupHub',
-      logo: 'https://logo.clearbit.com/stripe.com',
-      type: 'Full-time',
-      duration: 'Aug 2017 - May 2019 · 1 yr 10 mos',
-      location: 'Cairo, Egypt',
-      description: 'Full-stack development with React and Node.js.',
-    },
-  ],
-  education: [
-    {
-      id: 'ed1',
-      school: 'Stanford University',
-      logo: 'https://logo.clearbit.com/stanford.edu',
-      degree: "Master's degree, Computer Science",
-      duration: '2015 - 2017',
-    },
-    {
-      id: 'ed2',
-      school: 'Cairo University',
-      logo: 'https://logo.clearbit.com/cu.edu.eg',
-      degree: "Bachelor's degree, Software Engineering",
-      duration: '2011 - 2015',
-    },
-  ],
-  skills: [
-    'React.js',
-    'Node.js',
-    'TypeScript',
-    'System Design',
-    'AWS',
-    'GraphQL',
-    'Python',
-    'Kubernetes',
-    'PostgreSQL',
-    'Redis',
-  ],
-  languages: ['English (Native)', 'Arabic (Native)', 'Spanish (Conversational)'],
-};
+// DEPRECATED - DO NOT USE
+export const currentUser = null;
 
-export const peopleSeed = [
-  {
-    id: 'u1',
-    name: 'Sarah Mitchell',
-    headline: 'Product Manager at Microsoft | Ex-Google',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2',
-    cover: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2',
-    mutual: 32,
-    verified: true,
-  },
-  {
-    id: 'u2',
-    name: 'James Chen',
-    headline: 'Staff Engineer @ Stripe · Distributed Systems',
-    avatar: 'https://images.unsplash.com/photo-1629425733761-caae3b5f2e50',
-    cover: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab',
-    mutual: 21,
-    verified: false,
-  },
-  {
-    id: 'u3',
-    name: 'Priya Sharma',
-    headline: 'UX Designer | Crafting human-centered experiences',
+// DEPRECATED - DO NOT USE  
+export const peopleSeed = [];
     avatar: 'https://images.pexels.com/photos/37148308/pexels-photo-37148308.jpeg',
     cover: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72',
     mutual: 14,
