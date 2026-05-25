@@ -6,13 +6,13 @@ from app.models import ConnectionRequestIn
 from app.security import get_current_user
 from app.utils import uid, now_iso, create_notification
 from app.database import db
+from app.config import log
 
 router = APIRouter(prefix="/connections", tags=["connections"])
 
 
 async def batch_fetch_users(user_ids: List[str]) -> Dict[str, Dict[str, Any]]:
     """Batch fetch multiple users to avoid N+1 queries."""
-    from app.config import log
     unique_ids = list(set(user_ids))
     log.info(f"[batch_fetch_users] Fetching {len(unique_ids)} unique users: {unique_ids}")
     
@@ -35,7 +35,6 @@ async def batch_fetch_users(user_ids: List[str]) -> Dict[str, Dict[str, Any]]:
 @router.get("/invitations")
 async def list_invitations(current=Depends(get_current_user)):
     """List pending connection requests for the current user."""
-    from app.config import log
     log.info(f"[/invitations] Fetching invitations for user: {current['id']}")
     
     # Get pending invitations
