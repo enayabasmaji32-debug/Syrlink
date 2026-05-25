@@ -137,7 +137,7 @@ export default function Profile() {
                         <UserCheck className="w-4 h-4" /> Connected
                       </button>
                     )}
-                    <Link to="/messaging" className="border border-[#0a66c2] text-[#0a66c2] hover:bg-[#0a66c2]/10 font-semibold text-sm rounded-full px-4 py-1.5 flex items-center gap-1">
+                    <Link to={`/messaging/${profile.id}`} className="border border-[#0a66c2] text-[#0a66c2] hover:bg-[#0a66c2]/10 font-semibold text-sm rounded-full px-4 py-1.5 flex items-center gap-1">
                       <MessageSquare className="w-4 h-4" /> Message
                     </Link>
                     <button className="border border-gray-700 text-gray-700 hover:bg-gray-100 font-semibold text-sm rounded-full px-4 py-1.5">More</button>

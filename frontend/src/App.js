@@ -113,6 +113,7 @@ function Shell() {
       <Route path="/jobs" element={<Protected><Jobs /></Protected>} />
       <Route path="/my-applications" element={<Protected><MyApplications /></Protected>} />
       <Route path="/messaging" element={<Protected><Messaging /></Protected>} />
+      <Route path="/messaging/:userId" element={<Protected><Messaging /></Protected>} />
       <Route path="/notifications" element={<Protected><Notifications /></Protected>} />
       <Route path="/admin" element={<Protected><AdminPanel /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />

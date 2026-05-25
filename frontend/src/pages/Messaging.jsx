@@ -1,17 +1,43 @@
 import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Search, Send, MoreHorizontal, Edit3, ChevronDown, Smile, Paperclip, Image } from 'lucide-react';
 import { toast } from 'sonner';
+import { messagesApi } from '../api';
 
 export default function Messaging() {
+  const { userId } = useParams();
   const { conversations, sendMessage, user, loadThread } = useApp();
-  const [activeId, setActiveId] = useState(conversations[0]?.id);
+  const [activeId, setActiveId] = useState(null);
   const [text, setText] = useState('');
   const [q, setQ] = useState('');
+  const [loading, setLoading] = useState(false);
 
+  // When userId param changes, find or create conversation
   React.useEffect(() => {
-    if (!activeId && conversations.length) setActiveId(conversations[0].id);
-  }, [conversations, activeId]);
+    if (userId) {
+      // Try to find existing conversation with this user
+      const existing = conversations.find((c) => c.user?.id === userId || c.other_user_id === userId);
+      if (existing) {
+        setActiveId(existing.id);
+      } else {
+        // Create new conversation with this user
+        setLoading(true);
+        messagesApi.start(userId)
+          .then((conv) => {
+            setActiveId(conv.id);
+          })
+          .catch((err) => {
+            console.error('Failed to start conversation:', err);
+            toast.error('Failed to open conversation');
+          })
+          .finally(() => setLoading(false));
+      }
+    } else if (!activeId && conversations.length) {
+      // Default to first conversation if no userId specified
+      setActiveId(conversations[0]?.id);
+    }
+  }, [userId, conversations]);
 
   React.useEffect(() => {
     if (activeId) {
@@ -151,7 +177,9 @@ export default function Messaging() {
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">Select a conversation to start chatting.</div>
+            <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
+              {loading ? 'Opening conversation...' : 'Select a conversation to start chatting.'}
+            </div>
           )}
         </div>
       </div>
