@@ -5,7 +5,9 @@ export const authApi = {
   login: (d) => c.post('/auth/login', d).then((r) => r.data),
   me: () => c.get('/auth/me').then((r) => r.data),
   logout: () => c.post('/auth/logout').then((r) => r.data),
-  googleLoginUrl: () => `${process.env.REACT_APP_BACKEND_URL || ''}/api/auth/google/login`,
+  // Fallback to the current origin at runtime when the env var is empty
+  // (useful when the frontend is served from the same host as the backend)
+  googleLoginUrl: () => `${process.env.REACT_APP_BACKEND_URL || window.location.origin}/api/auth/google/login`,
 };
 
 export const usersApi = {
