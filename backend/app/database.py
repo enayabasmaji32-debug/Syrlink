@@ -21,7 +21,6 @@ try:
         retryWrites=True,
         w='majority',
         heartbeatFrequencyMS=10000,         # Heartbeat every 10 seconds
-        serverMonitoringMode='auto',
         connect=False,                      # Don't connect until first operation
     )
     log.info("✓ MongoDB client initialized with resilient settings")
