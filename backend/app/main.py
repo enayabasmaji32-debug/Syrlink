@@ -74,10 +74,21 @@ app.include_router(websocket_router, prefix=api_prefix)
 ROOT_DIR = Path(__file__).resolve().parents[2]
 FRONTEND_BUILD_DIR = ROOT_DIR / "frontend" / "build"
 if FRONTEND_BUILD_DIR.exists():
-    app.mount("/", StaticFiles(directory=FRONTEND_BUILD_DIR, html=True), name="frontend")
+    app.mount(
+        "/static",
+        StaticFiles(directory=FRONTEND_BUILD_DIR / "static"),
+        name="static",
+    )
+
+    @app.get("/", include_in_schema=False)
+    async def spa_index():
+        return FileResponse(FRONTEND_BUILD_DIR / "index.html")
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str):
+        requested_path = FRONTEND_BUILD_DIR / full_path
+        if requested_path.exists() and requested_path.is_file():
+            return FileResponse(requested_path)
         return FileResponse(FRONTEND_BUILD_DIR / "index.html")
 
 
