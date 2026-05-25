@@ -12,15 +12,22 @@ router = APIRouter(prefix="/connections", tags=["connections"])
 
 async def batch_fetch_users(user_ids: List[str]) -> Dict[str, Dict[str, Any]]:
     """Batch fetch multiple users to avoid N+1 queries."""
+    from app.config import log
     unique_ids = list(set(user_ids))
+    log.info(f"[batch_fetch_users] Fetching {len(unique_ids)} unique users: {unique_ids}")
+    
     users = await db.users.find(
         {"id": {"$in": unique_ids}}, 
         {"_id": 0, "id": 1, "name": 1, "avatar": 1, "headline": 1}
     ).to_list(len(unique_ids))
+    
+    log.info(f"[batch_fetch_users] Found {len(users)} users in DB: {users}")
+    
     user_map = {u["id"]: u for u in users}
     # Add defaults for missing users
     for _uid in unique_ids:
         if _uid not in user_map:
+            log.warning(f"[batch_fetch_users] User {_uid} not found, using Unknown")
             user_map[_uid] = {"id": _uid, "name": "Unknown", "avatar": "", "headline": ""}
     return user_map
 
@@ -28,17 +35,27 @@ async def batch_fetch_users(user_ids: List[str]) -> Dict[str, Dict[str, Any]]:
 @router.get("/invitations")
 async def list_invitations(current=Depends(get_current_user)):
     """List pending connection requests for the current user."""
+    from app.config import log
+    log.info(f"[/invitations] Fetching invitations for user: {current['id']}")
+    
     # Get pending invitations
     invs = await db.connections.find(
         {"receiver_id": current["id"], "status": "pending"}, {"_id": 0}
     ).sort("created_at", -1).limit(50).to_list(50)
+    
+    log.info(f"[/invitations] Found {len(invs)} invitations: {invs}")
     
     if not invs:
         return []
     
     # Batch fetch all requester users
     requester_ids = [inv["requester_id"] for inv in invs]
+    log.info(f"[/invitations] Requester IDs to fetch: {requester_ids}")
+    
     user_map = await batch_fetch_users(requester_ids)
+    
+    # Debug log
+    log.info(f"[/invitations] User map result: {user_map}")
     
     # Get current user's connections for mutual count calculation
     current_conns = await db.connections.find(
@@ -68,13 +85,14 @@ async def list_invitations(current=Depends(get_current_user)):
     out = [
         {
             "id": inv["id"],
-            "user": user_map[inv["requester_id"]],
+            "user": user_map.get(inv["requester_id"], {"id": inv["requester_id"], "name": "Unknown", "avatar": "", "headline": ""}),
             "note": inv.get("note", ""),
             "mutual": mutual_map.get(inv["requester_id"], 0),
             "created_at": inv["created_at"],
         }
         for inv in invs
     ]
+    log.info(f"[/invitations] Returning: {out}")
     return out
 
 

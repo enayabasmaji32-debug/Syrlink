@@ -61,18 +61,28 @@ export default function Network() {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => {
-                        ignoreInvite(inv.id);
-                        toast('Invitation ignored');
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await ignoreInvite(inv.id);
+                          toast('Invitation ignored');
+                        } catch (e) {
+                          toast.error(e?.response?.data?.detail || 'Failed to ignore invitation');
+                        }
                       }}
                       className="text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-full px-4 py-1"
                     >
                       Ignore
                     </button>
                     <button
-                      onClick={() => {
-                        acceptInvite(inv.id);
-                        toast.success(`You are now connected with ${invUser.name}`);
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await acceptInvite(inv.id);
+                          toast.success(`You are now connected with ${invUser.name}`);
+                        } catch (e) {
+                          toast.error(e?.response?.data?.detail || 'Failed to accept invitation');
+                        }
                       }}
                       className="text-sm font-semibold text-[#0a66c2] border border-[#0a66c2] hover:bg-[#0a66c2]/10 rounded-full px-4 py-1"
                     >

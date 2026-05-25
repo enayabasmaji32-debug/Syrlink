@@ -291,15 +291,29 @@ export function AppProvider({ children }) {
   };
 
   const acceptInvite = async (inviteId) => {
-    const inv = invitations.find((i) => i.id === inviteId);
-    await connectionsApi.accept(inviteId);
-    setInvitations((all) => all.filter((i) => i.id !== inviteId));
-    if (inv?.user?.id) setConnections((c) => new Set([...c, inv.user.id]));
+    try {
+      const inv = invitations.find((i) => i.id === inviteId);
+      console.log('[acceptInvite] Accepting:', inviteId, 'User:', inv?.user?.id);
+      await connectionsApi.accept(inviteId);
+      setInvitations((all) => all.filter((i) => i.id !== inviteId));
+      if (inv?.user?.id) setConnections((c) => new Set([...c, inv.user.id]));
+      console.log('[acceptInvite] Success');
+    } catch (e) {
+      console.error('[acceptInvite] Error:', e?.response?.status, e?.response?.data, e?.message);
+      throw e;
+    }
   };
 
   const ignoreInvite = async (inviteId) => {
-    await connectionsApi.ignore(inviteId);
-    setInvitations((all) => all.filter((i) => i.id !== inviteId));
+    try {
+      console.log('[ignoreInvite] Ignoring:', inviteId);
+      await connectionsApi.ignore(inviteId);
+      setInvitations((all) => all.filter((i) => i.id !== inviteId));
+      console.log('[ignoreInvite] Success');
+    } catch (e) {
+      console.error('[ignoreInvite] Error:', e?.response?.status, e?.response?.data, e?.message);
+      throw e;
+    }
   };
 
   const toggleSaveJob = async (jobId) => {
