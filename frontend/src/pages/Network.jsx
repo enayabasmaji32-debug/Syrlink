@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Users, X, UserPlus, Calendar, Hash, Newspaper, MoreHorizontal, ChevronRight } from 'lucide-react';
+import { Users, UserPlus, Calendar, Hash, Newspaper, ChevronRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
 
@@ -39,46 +39,51 @@ export default function Network() {
         {/* Invitations */}
         <section className="li-card p-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-base">Invitations ({invitations.length})</h2>
+            <h2 className="font-semibold text-base">Invitations ({invitations?.length || 0})</h2>
             <Link to="#" className="text-sm font-semibold text-gray-600 hover:bg-gray-100 px-2 py-1 rounded">See all</Link>
           </div>
           <ul className="divide-y divide-gray-100 mt-2">
-            {invitations.length === 0 && (
+            {(!invitations || invitations.length === 0) && (
               <li className="py-6 text-center text-sm text-gray-500">No pending invitations. ✨</li>
             )}
-            {invitations.map((inv) => (
-              <li key={inv.id} className="py-3 flex items-start gap-3">
-                <Link to={`/in/${inv.user.id}`}>
-                  <img src={inv.user.avatar} alt={inv.user.name} className="w-14 h-14 rounded-full object-cover" />
-                </Link>
-                <div className="flex-1 min-w-0">
-                  <Link to={`/in/${inv.user.id}`} className="font-semibold text-sm hover:underline">{inv.user.name}</Link>
-                  <p className="text-xs text-gray-600 line-clamp-2">{inv.user.headline}</p>
-                  {inv.note && <p className="text-xs text-gray-700 mt-1 italic">"{inv.note}"</p>}
-                  <p className="text-[11px] text-gray-500 mt-0.5">{inv.mutual} mutual connections</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      ignoreInvite(inv.id);
-                      toast('Invitation ignored');
-                    }}
-                    className="text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-full px-4 py-1"
-                  >
-                    Ignore
-                  </button>
-                  <button
-                    onClick={() => {
-                      acceptInvite(inv.id);
-                      toast.success(`You are now connected with ${inv.user.name}`);
-                    }}
-                    className="text-sm font-semibold text-[#0a66c2] border border-[#0a66c2] hover:bg-[#0a66c2]/10 rounded-full px-4 py-1"
-                  >
-                    Accept
-                  </button>
-                </div>
-              </li>
-            ))}
+            {(invitations || []).map((inv) => {
+              const invUser = inv?.user || { id: '', name: 'Unknown', avatar: '', headline: '' };
+              return (
+                <li key={inv.id || invUser.id || Math.random()} className="py-3 flex items-start gap-3">
+                  <Link to={invUser.id ? `/in/${invUser.id}` : '#'}>
+                    <img src={invUser.avatar} alt={invUser.name} className="w-14 h-14 rounded-full object-cover" />
+                  </Link>
+                  <div className="flex-1 min-w-0">
+                    <Link to={invUser.id ? `/in/${invUser.id}` : '#'} className="font-semibold text-sm hover:underline">{invUser.name}</Link>
+                    <p className="text-xs text-gray-600 line-clamp-2">{invUser.headline}</p>
+                    {inv.note && <p className="text-xs text-gray-700 mt-1 italic">"{inv.note}"</p>}
+                    <p className="text-[11px] text-gray-500 mt-0.5">{inv?.mutual ?? 0} mutual connections</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        ignoreInvite(inv.id);
+                        toast('Invitation ignored');
+                      }}
+                      disabled={!inv.id}
+                      className="text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-full px-4 py-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Ignore
+                    </button>
+                    <button
+                      onClick={() => {
+                        acceptInvite(inv.id);
+                        toast.success(`You are now connected with ${invUser.name}`);
+                      }}
+                      disabled={!inv.id}
+                      className="text-sm font-semibold text-[#0a66c2] border border-[#0a66c2] hover:bg-[#0a66c2]/10 rounded-full px-4 py-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Accept
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </section>
 
@@ -91,28 +96,28 @@ export default function Network() {
             </button>
           </div>
           <ul className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 mt-3">
-            {people.map((p) => {
+            {(people || []).filter((p) => p && p.id).map((p) => {
               const pending = pendingSent.has(p.id);
               const conn = connections.has(p.id);
               return (
                 <li key={p.id} className="border border-gray-200 rounded-lg overflow-hidden hover-lift bg-white">
                   <div
                     className="h-14 bg-cover bg-center"
-                    style={{ backgroundImage: `url(${p.cover})` }}
+                    style={{ backgroundImage: `url(${p.cover || ''})` }}
                   />
                   <div className="px-3 pb-3 -mt-8 text-center">
                     <Link to={`/in/${p.id}`}>
-                      <img src={p.avatar} alt={p.name} className="w-16 h-16 rounded-full border-2 border-white object-cover mx-auto" />
+                      <img src={p.avatar || ''} alt={p.name || 'User'} className="w-16 h-16 rounded-full border-2 border-white object-cover mx-auto" />
                     </Link>
                     <Link to={`/in/${p.id}`} className="block mt-2 font-semibold text-sm hover:underline line-clamp-1">
-                      {p.name}
+                      {p.name || 'Unknown User'}
                     </Link>
-                    <p className="text-xs text-gray-600 line-clamp-2 h-8 mt-0.5">{p.headline}</p>
-                    <p className="text-[11px] text-gray-500 mt-1">{p.mutual} mutual connections</p>
+                    <p className="text-xs text-gray-600 line-clamp-2 h-8 mt-0.5">{p.headline || ''}</p>
+                    <p className="text-[11px] text-gray-500 mt-1">{p.mutual ?? 0} mutual connections</p>
                     <button
                       onClick={() => {
                         sendConnect(p.id);
-                        toast(`Connection request sent to ${p.name}`);
+                        toast(`Connection request sent to ${p.name || 'user'}`);
                       }}
                       disabled={pending || conn}
                       className="mt-3 w-full inline-flex items-center justify-center gap-1 border border-[#0a66c2] text-[#0a66c2] font-semibold text-sm rounded-full px-3 py-1 hover:bg-[#0a66c2]/10 disabled:opacity-60 disabled:cursor-not-allowed"
@@ -123,6 +128,9 @@ export default function Network() {
                 </li>
               );
             })}
+            {(!people || people.length === 0) && (
+              <li className="col-span-full py-6 text-center text-sm text-gray-500">No suggested connections available right now.</li>
+            )}
           </ul>
         </section>
       </div>

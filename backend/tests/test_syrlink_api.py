@@ -159,6 +159,15 @@ def test_my_connections_and_pending_sent(demo_token):
     assert r2.status_code == 200 and isinstance(r2.json(), list)
 
 
+def test_connections_network_endpoint(demo_token):
+    r = requests.get(f"{API}/connections/network?limit=5", headers=H(demo_token))
+    assert r.status_code == 200
+    data = r.json()
+    assert isinstance(data, list)
+    assert all(isinstance(u, dict) for u in data)
+    assert all(u.get("relationship") in {"none", "connected", "pending_sent", "pending_received"} for u in data)
+
+
 # ---- JOBS ----
 def test_jobs_list_and_filters(demo_token):
     r = requests.get(f"{API}/jobs", headers=H(demo_token))

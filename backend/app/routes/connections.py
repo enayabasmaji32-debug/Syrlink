@@ -168,6 +168,47 @@ async def my_connections(current=Depends(get_current_user)):
     return users
 
 
+@router.get("/network")
+async def network_users(limit: int = 20, current=Depends(get_current_user)):
+    """Get users with current relationship status for network/friend discovery."""
+    relations = await db.connections.find(
+        {
+            "status": {"$in": ["accepted", "pending"]},
+            "$or": [
+                {"requester_id": current["id"]},
+                {"receiver_id": current["id"]},
+            ],
+        },
+        {"_id": 0, "id": 1, "requester_id": 1, "receiver_id": 1, "status": 1}
+    ).limit(1000).to_list(1000)
+
+    status_map = {}
+    for relation in relations:
+        other_id = relation["receiver_id"] if relation["requester_id"] == current["id"] else relation["requester_id"]
+        if relation["status"] == "accepted":
+            status_map[other_id] = {"relationship": "connected", "connection_id": relation["id"]}
+        elif relation["status"] == "pending":
+            if relation["requester_id"] == current["id"]:
+                status_map[other_id] = {"relationship": "pending_sent", "connection_id": relation["id"]}
+            else:
+                status_map[other_id] = {"relationship": "pending_received", "connection_id": relation["id"]}
+
+    users = await db.users.find(
+        {"id": {"$ne": current["id"]}},
+        {"_id": 0, "id": 1, "name": 1, "avatar": 1, "headline": 1, "cover": 1, "verified": 1}
+    ).limit(limit).to_list(limit)
+
+    out = []
+    for user in users:
+        const_status = status_map.get(user["id"], {})
+        out.append({
+            **user,
+            "relationship": const_status.get("relationship", "none"),
+            "connection_id": const_status.get("connection_id"),
+        })
+    return out
+
+
 @router.get("/pending-sent")
 async def pending_sent(current=Depends(get_current_user)):
     """Get list of pending connection requests sent by current user."""

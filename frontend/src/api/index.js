@@ -5,9 +5,13 @@ export const authApi = {
   login: (d) => c.post('/auth/login', d).then((r) => r.data),
   me: () => c.get('/auth/me').then((r) => r.data),
   logout: () => c.post('/auth/logout').then((r) => r.data),
-  // Fallback to the current origin at runtime when the env var is empty
+  // Fallback to the current origin at runtime when the env var is empty or just '/'
   // (useful when the frontend is served from the same host as the backend)
-  googleLoginUrl: () => `${process.env.REACT_APP_BACKEND_URL || window.location.origin}/api/auth/google/login`,
+  googleLoginUrl: () => {
+    const rawBackendUrl = process.env.REACT_APP_BACKEND_URL?.trim() || '';
+    const normalizedBackendUrl = rawBackendUrl === '/' ? '' : rawBackendUrl.replace(/\/$/, '');
+    return `${normalizedBackendUrl || window.location.origin}/api/auth/google/login`;
+  },
 };
 
 export const usersApi = {
@@ -41,6 +45,7 @@ export const connectionsApi = {
   ignore: (id) => c.post(`/connections/${id}/ignore`).then((r) => r.data),
   list: () => c.get('/connections/me').then((r) => r.data),
   mine: () => c.get('/connections/me').then((r) => r.data),
+  network: (limit = 20) => c.get(`/connections/network?limit=${limit}`).then((r) => r.data),
   pending: () => c.get('/connections/pending-sent').then((r) => r.data),
   pendingSent: () => c.get('/connections/pending-sent').then((r) => r.data),
 };

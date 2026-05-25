@@ -278,7 +278,7 @@ export function AppProvider({ children }) {
     const inv = invitations.find((i) => i.id === inviteId);
     await connectionsApi.accept(inviteId);
     setInvitations((all) => all.filter((i) => i.id !== inviteId));
-    if (inv) setConnections((c) => new Set([...c, inv.user.id]));
+    if (inv?.user?.id) setConnections((c) => new Set([...c, inv.user.id]));
   };
 
   const ignoreInvite = async (inviteId) => {
