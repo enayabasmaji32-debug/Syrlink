@@ -5,7 +5,7 @@ import { useApp } from '../context/AppContext';
 import { toast } from 'sonner';
 
 export default function Network() {
-  const { invitations, acceptInvite, ignoreInvite, networkUsers, sendConnect } = useApp();
+  const { invitations, acceptInvite, ignoreInvite, networkUsers, sendConnect, connections } = useApp();
 
   return (
     <div className="max-w-[1128px] mx-auto px-2 sm:px-4 py-4 grid grid-cols-12 gap-6">
