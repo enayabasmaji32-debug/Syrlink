@@ -186,8 +186,11 @@ async def my_connections(current=Depends(get_current_user)):
 
 
 @router.get("/network")
-async def network_users(limit: int = 20, current=Depends(get_current_user)):
-    """Get users with current relationship status for network/friend discovery."""
+async def network_users(current=Depends(get_current_user)):
+    """Get ALL users with current relationship status for network discovery."""
+    log.info(f"[/network] Fetching all users for user: {current['id']}")
+    
+    # Get all relationship statuses
     relations = await db.connections.find(
         {
             "status": {"$in": ["accepted", "pending"]},
@@ -197,7 +200,7 @@ async def network_users(limit: int = 20, current=Depends(get_current_user)):
             ],
         },
         {"_id": 0, "id": 1, "requester_id": 1, "receiver_id": 1, "status": 1}
-    ).limit(1000).to_list(1000)
+    ).to_list(5000)
 
     status_map = {}
     for relation in relations:
@@ -210,19 +213,26 @@ async def network_users(limit: int = 20, current=Depends(get_current_user)):
             else:
                 status_map[other_id] = {"relationship": "pending_received", "connection_id": relation["id"]}
 
-    users = await db.users.find(
+    log.info(f"[/network] Found {len(status_map)} relationships")
+
+    # Fetch ALL users except current user
+    all_users = await db.users.find(
         {"id": {"$ne": current["id"]}},
         {"_id": 0, "id": 1, "name": 1, "avatar": 1, "headline": 1, "cover": 1, "verified": 1}
-    ).limit(limit).to_list(limit)
+    ).to_list(10000)
+
+    log.info(f"[/network] Found {len(all_users)} total users (excluding current user)")
 
     out = []
-    for user in users:
+    for user in all_users:
         const_status = status_map.get(user["id"], {})
         out.append({
             **user,
-            "relationship": const_status.get("relationship", "none"),
+            "relationship": const_status.get("relationship", "not_connected"),
             "connection_id": const_status.get("connection_id"),
         })
+    
+    log.info(f"[/network] Returning {len(out)} users with relationship status")
     return out
 
 

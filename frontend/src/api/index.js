@@ -45,7 +45,7 @@ export const connectionsApi = {
   ignore: (id) => c.post(`/connections/${id}/ignore`).then((r) => r.data),
   list: () => c.get('/connections/me').then((r) => r.data),
   mine: () => c.get('/connections/me').then((r) => r.data),
-  network: (limit = 20) => c.get(`/connections/network?limit=${limit}`).then((r) => r.data),
+  network: () => c.get('/connections/network').then((r) => r.data),
   pending: () => c.get('/connections/pending-sent').then((r) => r.data),
   pendingSent: () => c.get('/connections/pending-sent').then((r) => r.data),
 };

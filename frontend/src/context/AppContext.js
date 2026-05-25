@@ -36,6 +36,7 @@ export function AppProvider({ children }) {
   const [ownedCompanies, setOwnedCompanies] = useState([]);
   const [activeCompanyId, setActiveCompanyId] = useState(localStorage.getItem('li_active_company') || '');
   const [people, setPeople] = useState([]);
+  const [networkUsers, setNetworkUsers] = useState([]); // All users with relationship status
   const [invitations, setInvitations] = useState([]);
   const [connections, setConnections] = useState(new Set());
   const [pendingSent, setPendingSent] = useState(new Set());
@@ -92,6 +93,7 @@ export function AppProvider({ children }) {
     // Phase 2: باقي البيانات بالتوازي بدون await (ما تبلّك الـ UI)
     Promise.allSettled([
       companiesApi.myCompanies().then(setOwnedCompanies).catch(() => {}),
+      connectionsApi.network().then((data) => setNetworkUsers(Array.isArray(data) ? data : [])).catch(() => setNetworkUsers([])),
       usersApi.suggestions().then((data) => setPeople(Array.isArray(data) ? data : [])).catch(() => setPeople([])),
       connectionsApi.list().then((data) => {
         setConnections(new Set((data || []).map((c) => c.id)));
@@ -209,7 +211,7 @@ export function AppProvider({ children }) {
     eraseCookie('li_token');
     setToken(null);
     setUser(null);
-    setPosts([]); setCommentsByPost({}); setOwnedCompanies([]); setActiveCompanyId(''); setPeople([]); setInvitations([]);
+    setPosts([]); setCommentsByPost({}); setOwnedCompanies([]); setActiveCompanyId(''); setPeople([]); setNetworkUsers([]); setInvitations([]);
     setConnections(new Set()); setPendingSent(new Set());
     setSavedJobs(new Set()); setAppliedJobs(new Set());
     setConversations([]); setNotifications([]);
@@ -284,19 +286,32 @@ export function AppProvider({ children }) {
   };
 
   const sendConnect = async (userId) => {
-    setPendingSent((s) => new Set([...s, userId]));
-    try { await connectionsApi.request(userId); } catch (e) {
-      setPendingSent((s) => { const n = new Set(s); n.delete(userId); return n; });
+    // Update UI optimistically
+    setNetworkUsers((users) => users.map((u) => u.id === userId ? { ...u, relationship: 'pending_sent' } : u));
+    try { 
+      await connectionsApi.request(userId); 
+    } catch (e) {
+      setNetworkUsers((users) => users.map((u) => u.id === userId ? { ...u, relationship: 'not_connected' } : u));
     }
   };
 
-  const acceptInvite = async (inviteId) => {
+  const acceptInvite = async (inviteId, userId = null) => {
     try {
-      const inv = invitations.find((i) => i.id === inviteId);
-      console.log('[acceptInvite] Accepting:', inviteId, 'User:', inv?.user?.id);
+      const inv = userId ? null : invitations.find((i) => i.id === inviteId);
+      const actualUserId = userId || inv?.user?.id;
+      console.log('[acceptInvite] Accepting:', inviteId, 'User:', actualUserId);
+      
       await connectionsApi.accept(inviteId);
+      
+      // Update states
       setInvitations((all) => all.filter((i) => i.id !== inviteId));
-      if (inv?.user?.id) setConnections((c) => new Set([...c, inv.user.id]));
+      if (actualUserId) setConnections((c) => new Set([...c, actualUserId]));
+      
+      // Update networkUsers
+      if (actualUserId) {
+        setNetworkUsers((users) => users.map((u) => u.id === actualUserId ? { ...u, relationship: 'connected' } : u));
+      }
+      
       console.log('[acceptInvite] Success');
     } catch (e) {
       console.error('[acceptInvite] Error:', e?.response?.status, e?.response?.data, e?.message);
@@ -304,11 +319,22 @@ export function AppProvider({ children }) {
     }
   };
 
-  const ignoreInvite = async (inviteId) => {
+  const ignoreInvite = async (inviteId, userId = null) => {
     try {
+      const inv = userId ? null : invitations.find((i) => i.id === inviteId);
+      const actualUserId = userId || inv?.user?.id;
       console.log('[ignoreInvite] Ignoring:', inviteId);
+      
       await connectionsApi.ignore(inviteId);
+      
+      // Update states
       setInvitations((all) => all.filter((i) => i.id !== inviteId));
+      
+      // Update networkUsers
+      if (actualUserId) {
+        setNetworkUsers((users) => users.map((u) => u.id === actualUserId ? { ...u, relationship: 'not_connected' } : u));
+      }
+      
       console.log('[ignoreInvite] Success');
     } catch (e) {
       console.error('[ignoreInvite] Error:', e?.response?.status, e?.response?.data, e?.message);
@@ -370,7 +396,7 @@ export function AppProvider({ children }) {
     user, authReady, login, register, logout, setUser,
     posts, commentsByPost, addPost, toggleLike, addComment, loadComments, repostPost, deletePost, updatePost,
     ownedCompanies, activeCompany, setActiveCompany,
-    people, invitations, connections, pendingSent,
+    people, networkUsers, invitations, connections, pendingSent,
     sendConnect, acceptInvite, ignoreInvite,
     savedJobs, appliedJobs, toggleSaveJob, applyJob,
     conversations, sendMessage, loadThread,
