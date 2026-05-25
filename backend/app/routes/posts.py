@@ -1,5 +1,6 @@
 """Posts and feed routes."""
 from typing import Optional, Dict, Any, List
+import asyncio
 from fastapi import APIRouter, HTTPException, Depends, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -69,14 +70,30 @@ async def batch_fetch_users(author_ids: List[str]) -> Dict[str, Dict[str, Any]]:
 
 
 @router.get("")
-async def list_posts(cursor: Optional[str] = None, limit: int = 10, company_id: Optional[str] = None, current=Depends(get_current_user)):
-    """List posts with pagination."""
+async def list_posts(cursor: Optional[str] = None, limit: int = 5, company_id: Optional[str] = None, current=Depends(get_current_user)):
+    """List posts with pagination (optimized for speed)."""
+    # Cap limit to prevent slow queries
+    limit = min(limit, 20)
+    
     query: Dict[str, Any] = {}
     if cursor:
         query["created_at"] = {"$lt": cursor}
     if company_id:
         query["company_id"] = company_id
-    posts = await db.posts.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    posts = await db.posts.find(query, {
+        "_id": 0, 
+        "id": 1, 
+        "author_id": 1, 
+        "company_id": 1,
+        "content": 1, 
+        "image": 1, 
+        "visibility": 1,
+        "likes_count": 1, 
+        "comments_count": 1, 
+        "reposts_count": 1,
+        "created_at": 1,
+    }).sort("created_at", -1).limit(limit).to_list(limit)
     
     if not posts:
         return {"items": [], "next_cursor": None}
@@ -91,23 +108,23 @@ async def list_posts(cursor: Optional[str] = None, limit: int = 10, company_id: 
     likes = await db.post_likes.find({"post_id": {"$in": post_ids}, "user_id": current["id"]}, {"post_id": 1}).to_list(limit)
     liked_post_ids = {like["post_id"] for like in likes}
     
-    # Serialize all posts efficiently
-    items = [
-        await serialize_post_with_author(
+    # Serialize all posts in parallel (not sequential)
+    items = await asyncio.gather(*[
+        serialize_post_with_author(
             p,
             company_map[p["company_id"]] if p.get("company_id") else user_map[p["author_id"]],
             current["id"],
             p["id"] in liked_post_ids,
         )
         for p in posts
-    ]
+    ])
     
     next_cursor = posts[-1]["created_at"] if len(posts) == limit else None
     return {"items": items, "next_cursor": next_cursor}
 
 
 @router.post("")
-@limiter.limit("10/minute")
+@limiter.limit("100/minute")
 async def create_post(request: Request, data: PostIn, current=Depends(get_current_user)):
     """Create a new post."""
     doc = {
@@ -139,13 +156,15 @@ async def create_post(request: Request, data: PostIn, current=Depends(get_curren
             "name": company["name"],
             "avatar": company.get("logo", ""),
             "headline": company.get("tagline", ""),
+            "verified": False,
         }
     else:
         author = {
             "id": current["id"],
-            "name": current["name"],
+            "name": current.get("name", "Unknown"),
             "avatar": current.get("avatar", ""),
             "headline": current.get("headline", ""),
+            "verified": current.get("verified", False),
         }
 
     return {

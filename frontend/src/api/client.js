@@ -39,6 +39,17 @@ client.interceptors.response.use(
       }
     }
     
+    // If 502/503 (gateway/service unavailable), retry
+    if ((err?.response?.status === 502 || err?.response?.status === 503) && 
+        (!retryCount[err.config.url] || retryCount[err.config.url] < MAX_RETRIES)) {
+      retryCount[err.config.url] = (retryCount[err.config.url] || 0) + 1;
+      console.warn(`Server unavailable (${err.response.status}), retrying (attempt ${retryCount[err.config.url]}/${MAX_RETRIES})`);
+      
+      // Wait before retrying (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 1000 * retryCount[err.config.url]));
+      return client.request(err.config);
+    }
+    
     if (err?.response?.status === 401) {
       localStorage.removeItem('li_token');
       // Redirect to login if not already there (only on protected routes)

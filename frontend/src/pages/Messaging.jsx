@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Search, Send, MoreHorizontal, Edit3, ChevronDown, Smile, Paperclip, Image } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function Messaging() {
   const { conversations, sendMessage, user, loadThread } = useApp();
@@ -24,11 +25,19 @@ export default function Messaging() {
 
   const filtered = conversations.filter((c) => c.user.name.toLowerCase().includes(q.toLowerCase()));
 
-  const submit = () => {
+  const submit = async () => {
     const t = text.trim();
     if (!t || !active) return;
-    sendMessage(active.id, t);
-    setText('');
+    try {
+      console.log('[Messaging] Sending message to', active.id, ':', t);
+      await sendMessage(active.id, t);
+      setText('');
+      toast.success('Message sent');
+    } catch (e) {
+      console.error('[Messaging] Send error:', e?.response?.status, e?.response?.data, e?.message);
+      const errorMsg = e?.response?.data?.detail || e?.message || 'Failed to send message';
+      toast.error(errorMsg);
+    }
   };
 
   return (

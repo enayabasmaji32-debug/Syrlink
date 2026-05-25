@@ -19,6 +19,7 @@ from app.routes.auth import router as auth_router
 from app.routes.users import router as users_router
 from app.routes.posts import router as posts_router
 from app.routes.connections import router as connections_router
+from app.routes.relationships import router as relationships_router
 from app.routes.jobs import router as jobs_router
 from app.routes.messages import router as messages_router
 from app.routes.notifications import router as notifications_router
@@ -54,6 +55,7 @@ app.include_router(auth_router, prefix=api_prefix)
 app.include_router(users_router, prefix=api_prefix)
 app.include_router(posts_router, prefix=api_prefix)
 app.include_router(connections_router, prefix=api_prefix)
+app.include_router(relationships_router, prefix=api_prefix)
 app.include_router(jobs_router, prefix=api_prefix)
 app.include_router(messages_router, prefix=api_prefix)
 app.include_router(notifications_router, prefix=api_prefix)
@@ -125,6 +127,23 @@ async def startup():
         log.info("✓ Connections collection indexes created")
     except Exception as e:
         log.warning(f"Connections indexes: {e}")
+    
+    # FOLLOWERS collection (unidirectional follow)
+    try:
+        await db.followers.create_index([("follower_id", 1), ("following_id", 1)], unique=True)
+        await db.followers.create_index([("following_id", 1), ("created_at", -1)])
+        await db.followers.create_index([("follower_id", 1)])
+        log.info("✓ Followers collection indexes created")
+    except Exception as e:
+        log.warning(f"Followers indexes: {e}")
+    
+    # BLOCKED_USERS collection
+    try:
+        await db.blocked_users.create_index([("blocker_id", 1), ("blocked_id", 1)], unique=True)
+        await db.blocked_users.create_index([("blocked_id", 1)])
+        log.info("✓ Blocked users collection indexes created")
+    except Exception as e:
+        log.warning(f"Blocked users indexes: {e}")
     
     # MESSAGES indexes
     try:
@@ -220,30 +239,36 @@ async def startup():
         log.warning(f"Position requests indexes: {e}")
     
     # Auto seed if empty
-    if await db.users.count_documents({}) == 0:
-        try:
-            from seed import run_seed
-            await run_seed(db)
-            log.info("✓ Seed data inserted.")
-        except Exception as e:
-            log.warning(f"Seed failed: {e}")
+    try:
+        if await db.users.count_documents({}) == 0:
+            try:
+                from seed import run_seed
+                await run_seed(db)
+                log.info("✓ Seed data inserted.")
+            except Exception as e:
+                log.warning(f"Seed failed: {e}")
+    except Exception as e:
+        log.warning(f"Could not check if database is empty (MongoDB may be initializing): {e}")
     
     # Ensure admin user exists
-    existing_admin = await db.users.find_one({"email": ADMIN_EMAIL})
-    if not existing_admin:
-        await db.users.insert_one({
-            "id": uid(), "name": "SyrLink Admin", "email": ADMIN_EMAIL,
-            "password_hash": hash_password(ADMIN_PASSWORD),
-            "avatar": "https://api.dicebear.com/7.x/initials/svg?seed=Admin",
-            "cover": "", "headline": "Platform Administrator", "location": "Damascus",
-            "about": "", "verified": True, "is_admin": True, "email_verified": True,
-            "experience": [], "education": [], "skills": [], "languages": [],
-            "connections": 0, "created_at": now_iso(),
-        })
-        log.info("✓ Admin user created")
-    else:
-        await db.users.update_one({"email": ADMIN_EMAIL}, {"$set": {"is_admin": True, "verified": True}})
-        log.info("✓ Admin user verified")
+    try:
+        existing_admin = await db.users.find_one({"email": ADMIN_EMAIL})
+        if not existing_admin:
+            await db.users.insert_one({
+                "id": uid(), "name": "SyrLink Admin", "email": ADMIN_EMAIL,
+                "password_hash": hash_password(ADMIN_PASSWORD),
+                "avatar": "https://api.dicebear.com/7.x/initials/svg?seed=Admin",
+                "cover": "", "headline": "Platform Administrator", "location": "Damascus",
+                "about": "", "verified": True, "is_admin": True, "email_verified": True,
+                "experience": [], "education": [], "skills": [], "languages": [],
+                "connections": 0, "created_at": now_iso(),
+            })
+            log.info("✓ Admin user created")
+        else:
+            await db.users.update_one({"email": ADMIN_EMAIL}, {"$set": {"is_admin": True, "verified": True}})
+            log.info("✓ Admin user verified")
+    except Exception as e:
+        log.warning(f"Could not ensure admin user exists: {e}")
     
     log.info("✓ SyrLink backend ready!")
 

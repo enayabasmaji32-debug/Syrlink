@@ -92,13 +92,13 @@ export function AppProvider({ children }) {
     // Phase 2: باقي البيانات بالتوازي بدون await (ما تبلّك الـ UI)
     Promise.allSettled([
       companiesApi.myCompanies().then(setOwnedCompanies).catch(() => {}),
-      usersApi.suggestions().then(setPeople).catch(() => {}),
+      usersApi.suggestions().then((data) => setPeople(Array.isArray(data) ? data : [])).catch(() => setPeople([])),
       connectionsApi.list().then((data) => {
         setConnections(new Set((data || []).map((c) => c.id)));
       }).catch(() => {}),
       connectionsApi.pending().then((data) => {
-        setInvitations(data || []);
-      }).catch(() => {}),
+        setInvitations(Array.isArray(data) ? data : []);
+      }).catch(() => setInvitations([])),
       jobsApi.saved().then((ids) => setSavedJobs(new Set(ids || []))).catch(() => {}),
       messagesApi.conversations().then(setConversations).catch(() => {}),
     ]);
@@ -216,8 +216,24 @@ export function AppProvider({ children }) {
   };
 
   const addPost = async (content, image, company_id = null) => {
-    const created = await postsApi.create({ content, image: image || null, visibility: 'Anyone', company_id });
-    setPosts((p) => [created, ...p]);
+    try {
+      const payload = {
+        content: content || '',
+        image: image && image.trim() ? image : null,
+        visibility: 'Anyone',
+        company_id: company_id || null,
+      };
+      console.log('[addPost] Sending:', payload);
+      const created = await postsApi.create(payload);
+      console.log('[addPost] Response:', created);
+      if (!created || !created.id) {
+        throw new Error('Invalid response from server: missing post ID');
+      }
+      setPosts((p) => [created, ...p]);
+    } catch (e) {
+      console.error('[addPost] Error:', e?.response?.status, e?.response?.data, e?.message);
+      throw e;
+    }
   };
 
   const repostPost = async (postId, comment = '') => {
@@ -304,10 +320,22 @@ export function AppProvider({ children }) {
   };
 
   const sendMessage = async (convId, text) => {
-    const msg = await messagesApi.send(convId, text);
-    setConversations((convs) => convs.map((c) => c.id === convId
-      ? { ...c, lastMessage: text, timeAgo: 'now', unread: false, thread: [...(c.thread || []), msg] }
-      : c));
+    try {
+      const payload = { text: text?.trim() || '' };
+      if (!payload.text) throw new Error('Message cannot be empty');
+      console.log('[sendMessage] Sending to', convId, ':', payload);
+      const msg = await messagesApi.send(convId, payload.text);
+      console.log('[sendMessage] Response:', msg);
+      if (!msg || !msg.id) {
+        throw new Error('Invalid response: missing message ID');
+      }
+      setConversations((convs) => convs.map((c) => c.id === convId
+        ? { ...c, lastMessage: text, timeAgo: 'now', unread: false, thread: [...(c.thread || []), msg] }
+        : c));
+    } catch (e) {
+      console.error('[sendMessage] Error:', e?.response?.status, e?.response?.data, e?.message);
+      throw e;
+    }
   };
 
   const loadThread = async (convId) => {
