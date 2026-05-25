@@ -12,7 +12,17 @@ from app.models import (
 from app.security import hash_password, verify_password, create_token, get_current_user
 from app.utils import uid, now_iso
 from app.database import db
-from app.config import APP_URL, RESEND_FROM, log, JWT_COOKIE_NAME, JWT_COOKIE_MAX_AGE, COOKIE_SECURE
+from app.config import (
+    APP_URL,
+    RESEND_FROM,
+    log,
+    JWT_COOKIE_NAME,
+    JWT_COOKIE_MAX_AGE,
+    COOKIE_SECURE,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    GOOGLE_OAUTH_REDIRECT,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
