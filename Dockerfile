@@ -5,7 +5,7 @@ COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install
 COPY frontend/ ./
 # Set backend URL for production (same host, /api prefix)
-ENV REACT_APP_BACKEND_URL=
+ENV REACT_APP_BACKEND_URL=/
 RUN npm run build
 
 # Build backend image
