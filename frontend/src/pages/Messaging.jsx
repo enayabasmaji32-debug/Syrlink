@@ -25,7 +25,19 @@ export default function Messaging() {
         setLoading(true);
         messagesApi.start(userId)
           .then((conv) => {
-            setActiveId(conv.id);
+            // Reload conversations list to get updated data with user info
+            messagesApi.conversations()
+              .then((updatedConvs) => {
+                // Find the new conversation in updated list
+                const newConv = updatedConvs.find((c) => c.id === conv.id);
+                if (newConv) {
+                  setActiveId(newConv.id);
+                }
+              })
+              .catch(() => {
+                // Fallback: just use the returned conversation
+                setActiveId(conv.id);
+              });
           })
           .catch((err) => {
             console.error('Failed to start conversation:', err);
