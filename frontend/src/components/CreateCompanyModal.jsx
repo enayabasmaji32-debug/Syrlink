@@ -156,25 +156,25 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold">Create Company</h2>
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-3 sm:p-6 flex items-center justify-between">
+          <h2 className="text-lg sm:text-xl font-bold">Create Company</h2>
           <button
             onClick={onClose}
             disabled={loading}
-            className="p-2 hover:bg-gray-100 rounded-full"
+            className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-full shrink-0"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 sm:w-5 h-4 sm:h-5" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-3 sm:p-6 space-y-4">
           {/* Company Name */}
           <div>
-            <label htmlFor="company-name" className="block text-sm font-semibold text-gray-900 mb-1">
+            <label htmlFor="company-name" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
               Company Name *
             </label>
             <input
@@ -184,14 +184,14 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
               value={formData.name}
               onChange={handleInputChange}
               placeholder="Enter company name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
               disabled={loading}
             />
           </div>
 
           {/* Industry */}
           <div>
-            <label htmlFor="company-industry" className="block text-sm font-semibold text-gray-900 mb-1">
+            <label htmlFor="company-industry" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
               Industry *
             </label>
             <input
@@ -208,7 +208,7 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
 
           {/* Registration Number */}
           <div>
-            <label htmlFor="company-registration-number" className="block text-sm font-semibold text-gray-900 mb-1">
+            <label htmlFor="company-registration-number" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
               Registration Number *
             </label>
             <input
@@ -218,14 +218,14 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
               value={formData.registration_number}
               onChange={handleInputChange}
               placeholder="Enter registration number"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
               disabled={loading}
             />
           </div>
 
           {/* Employees Count */}
           <div>
-            <label htmlFor="company-employees-count" className="block text-sm font-semibold text-gray-900 mb-1">
+            <label htmlFor="company-employees-count" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
               Number of Employees *
             </label>
             <input
@@ -235,7 +235,7 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
               value={formData.employees_count}
               onChange={handleInputChange}
               placeholder="Enter number of employees"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
               disabled={loading}
               min="0"
             />
@@ -253,14 +253,14 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
               value={formData.owner_name}
               onChange={handleInputChange}
               placeholder="Enter owner's full name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
               disabled={loading}
             />
           </div>
 
           {/* CEO Name */}
           <div>
-            <label htmlFor="company-ceo-name" className="block text-sm font-semibold text-gray-900 mb-1">
+            <label htmlFor="company-ceo-name" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
               CEO Name *
             </label>
             <input
@@ -270,14 +270,14 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
               value={formData.ceo_name}
               onChange={handleInputChange}
               placeholder="Enter CEO's full name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
               disabled={loading}
             />
           </div>
 
           {/* Website */}
           <div>
-            <label htmlFor="company-website" className="block text-sm font-semibold text-gray-900 mb-1">
+            <label htmlFor="company-website" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
               Website
             </label>
             <input
@@ -287,14 +287,14 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
               value={formData.website}
               onChange={handleInputChange}
               placeholder="https://example.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
               disabled={loading}
             />
           </div>
 
           {/* Location */}
           <div>
-            <label htmlFor="company-location" className="block text-sm font-semibold text-gray-900 mb-1">
+            <label htmlFor="company-location" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
               Location
             </label>
             <input
@@ -304,16 +304,16 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
               value={formData.location}
               onChange={handleInputChange}
               placeholder="e.g., Damascus, Syria"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
               disabled={loading}
             />
           </div>
 
           {/* Investment */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-1">Are you looking for investors? *</label>
+            <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">Are you looking for investors? *</label>
             <div className="flex gap-4 mt-1">
-              <label className="flex items-center gap-1">
+              <label className="flex items-center gap-1 text-xs sm:text-sm">
                 <input
                   type="radio"
                   name="is_looking_for_investors"
@@ -325,7 +325,7 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
                 />
                 Yes
               </label>
-              <label className="flex items-center gap-1">
+              <label className="flex items-center gap-1 text-xs sm:text-sm">
                 <input
                   type="radio"
                   name="is_looking_for_investors"
@@ -342,9 +342,9 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
 
           {/* Additional Investment Fields */}
           {formData.is_looking_for_investors === true && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border rounded-lg p-4 my-2 bg-gray-50">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 border rounded-lg p-3 sm:p-4 my-2 bg-gray-50">
               <div>
-                <label htmlFor="valuation" className="block text-sm font-semibold text-gray-900 mb-1">Estimated Company Valuation</label>
+                <label htmlFor="valuation" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">Estimated Company Valuation</label>
                 <input
                   id="valuation"
                   type="number"
@@ -352,13 +352,13 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
                   value={formData.valuation}
                   onChange={handleInputChange}
                   placeholder="e.g. 1000000"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+                  className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
                   disabled={loading}
                   min="0"
                 />
               </div>
               <div>
-                <label htmlFor="investment_type" className="block text-sm font-semibold text-gray-900 mb-1">Type of Investment Needed</label>
+                <label htmlFor="investment_type" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">Type of Investment Needed</label>
                 <input
                   id="investment_type"
                   type="text"
@@ -366,12 +366,12 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
                   value={formData.investment_type}
                   onChange={handleInputChange}
                   placeholder="e.g. Equity, Debt, Convertible Note"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+                  className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
                   disabled={loading}
                 />
               </div>
               <div>
-                <label htmlFor="funding_amount" className="block text-sm font-semibold text-gray-900 mb-1">Requested Funding Amount</label>
+                <label htmlFor="funding_amount" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">Requested Funding Amount</label>
                 <input
                   id="funding_amount"
                   type="number"
@@ -379,13 +379,13 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
                   value={formData.funding_amount}
                   onChange={handleInputChange}
                   placeholder="e.g. 50000"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+                  className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
                   disabled={loading}
                   min="0"
                 />
               </div>
               <div>
-                <label htmlFor="company_status" className="block text-sm font-semibold text-gray-900 mb-1">Current Company Status</label>
+                <label htmlFor="company_status" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">Current Company Status</label>
                 <input
                   id="company_status"
                   type="text"
@@ -393,12 +393,12 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
                   value={formData.company_status}
                   onChange={handleInputChange}
                   placeholder="e.g. Growth stage, Expansion, ..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+                  className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
                   disabled={loading}
                 />
               </div>
               <div>
-                <label htmlFor="available_equity" className="block text-sm font-semibold text-gray-900 mb-1">Available Equity for Investment (%)</label>
+                <label htmlFor="available_equity" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">Available Equity for Investment (%)</label>
                 <input
                   id="available_equity"
                   type="number"
@@ -406,14 +406,14 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
                   value={formData.available_equity}
                   onChange={handleInputChange}
                   placeholder="e.g. 10"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+                  className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
                   disabled={loading}
                   min="0"
                   max="100"
                 />
               </div>
               <div>
-                <label htmlFor="funding_round_status" className="block text-sm font-semibold text-gray-900 mb-1">Funding Round Status</label>
+                <label htmlFor="funding_round_status" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">Funding Round Status</label>
                 <input
                   id="funding_round_status"
                   type="text"
@@ -421,14 +421,14 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
                   value={formData.funding_round_status}
                   onChange={handleInputChange}
                   placeholder="e.g. Seed, Series A, ..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+                  className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
                   disabled={loading}
                 />
               </div>
             </div>
           )}
           <div>
-            <label htmlFor="company-tagline" className="block text-sm font-semibold text-gray-900 mb-1">
+            <label htmlFor="company-tagline" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
               Tagline
             </label>
             <input
@@ -438,14 +438,14 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
               value={formData.tagline}
               onChange={handleInputChange}
               placeholder="Short company description"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
               disabled={loading}
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="company-logo" className="block text-sm font-semibold text-gray-900 mb-1">
+              <label htmlFor="company-logo" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
                 Company Logo
               </label>
               <input
@@ -453,15 +453,15 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
                 type="file"
                 accept="image/*"
                 onChange={(e) => handleImageUpload(e, 'logo')}
-                className="w-full text-sm"
+                className="w-full text-xs sm:text-sm"
                 disabled={loading || uploading}
               />
               {formData.logo && (
-                <img src={formData.logo} alt="Logo preview" className="mt-2 w-24 h-24 rounded-lg object-cover border" />
+                <img src={formData.logo} alt="Logo preview" className="mt-2 w-20 sm:w-24 h-20 sm:h-24 rounded-lg object-cover border" />
               )}
             </div>
             <div>
-              <label htmlFor="company-cover" className="block text-sm font-semibold text-gray-900 mb-1">
+              <label htmlFor="company-cover" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
                 Cover Image
               </label>
               <input
@@ -469,17 +469,17 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
                 type="file"
                 accept="image/*"
                 onChange={(e) => handleImageUpload(e, 'cover')}
-                className="w-full text-sm"
+                className="w-full text-xs sm:text-sm"
                 disabled={loading || uploading}
               />
               {formData.cover && (
-                <img src={formData.cover} alt="Cover preview" className="mt-2 w-full h-24 rounded-lg object-cover border" />
+                <img src={formData.cover} alt="Cover preview" className="mt-2 w-full h-20 sm:h-24 rounded-lg object-cover border" />
               )}
             </div>
           </div>
 
           <div>
-            <label htmlFor="company-about" className="block text-sm font-semibold text-gray-900 mb-1">
+            <label htmlFor="company-about" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
               About Company
             </label>
             <textarea
@@ -489,14 +489,14 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
               onChange={handleInputChange}
               placeholder="Tell us about your company..."
               rows="3"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50 resize-none"
+              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50 resize-none"
               disabled={loading}
             />
           </div>
 
           {/* Commercial Registry Image Upload */}
           <div>
-            <label htmlFor="company-commercial-registry-image" className="block text-sm font-semibold text-gray-900 mb-2">
+            <label htmlFor="company-commercial-registry-image" className="block text-xs sm:text-sm font-semibold text-gray-900 mb-2">
               Commercial Registry Image *
             </label>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
@@ -510,7 +510,7 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
                   <button
                     type="button"
                     onClick={() => setFormData(prev => ({ ...prev, commercial_registry_image: '' }))}
-                    className="text-sm text-red-600 hover:text-red-700"
+                    className="text-xs sm:text-sm text-red-600 hover:text-red-700"
                     disabled={loading}
                   >
                     Remove image
@@ -519,8 +519,8 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
               ) : (
                 <label className="cursor-pointer">
                   <div className="flex flex-col items-center gap-2">
-                    <Upload className="w-5 h-5 text-gray-400" />
-                    <span className="text-sm text-gray-600">Click to upload commercial registry image</span>
+                    <Upload className="w-4 sm:w-5 h-4 sm:h-5 text-gray-400" />
+                    <span className="text-xs sm:text-sm text-gray-600">Click to upload commercial registry image</span>
                   </div>
                   <input
                     id="company-commercial-registry-image"
@@ -534,31 +534,31 @@ export default function CreateCompanyModal({ isOpen, onClose, onSuccess }) {
               )}
               {uploading && (
                 <div className="flex items-center justify-center gap-2 mt-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm text-gray-500">Uploading...</span>
+                  <Loader2 className="w-3 sm:w-4 h-3 sm:h-4 animate-spin" />
+                  <span className="text-xs sm:text-sm text-gray-500">Uploading...</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* Buttons */}
-          <div className="flex gap-2 pt-4">
+          <div className="flex flex-col sm:flex-row gap-2 pt-4">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-900 hover:bg-gray-50 disabled:opacity-50"
+              className="flex-1 px-2 sm:px-4 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm font-semibold text-gray-900 hover:bg-gray-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || uploading}
-              className="flex-1 px-4 py-2 bg-[#0a66c2] text-white rounded-lg text-sm font-semibold hover:bg-[#004182] disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 px-2 sm:px-4 py-1.5 sm:py-2 bg-[#0a66c2] text-white rounded-lg text-xs sm:text-sm font-semibold hover:bg-[#004182] disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-3 sm:w-4 h-3 sm:h-4 animate-spin" />
                   Submitting...
                 </>
               ) : (

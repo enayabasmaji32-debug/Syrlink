@@ -2,6 +2,8 @@ import React from 'react';
 import LeftSidebar from '../components/LeftSidebar';
 import RightSidebar from '../components/RightSidebar';
 import CreatePost from '../components/CreatePost';
+import CreateArticle from '../components/CreateArticle';
+import CreateEvent from '../components/CreateEvent';
 import PostCard from '../components/PostCard';
 import { useApp } from '../context/AppContext';
 import { Filter } from 'lucide-react';
@@ -18,12 +20,14 @@ export default function Feed() {
   }
   
   return (
-    <div className="max-w-[1128px] mx-auto px-2 sm:px-4 py-4 grid grid-cols-12 gap-6">
+    <div className="max-w-[1128px] mx-auto px-2 sm:px-4 py-3 sm:py-4 grid grid-cols-12 gap-3 sm:gap-6">
       <div className="hidden lg:block lg:col-span-3 sticky top-[68px] self-start">
         <LeftSidebar />
       </div>
-      <div className="col-span-12 lg:col-span-6 space-y-2">
+      <div className="col-span-12 lg:col-span-6 space-y-1 sm:space-y-2">
         <CreatePost />
+        <CreateArticle />
+        <CreateEvent />
         <div className="flex items-center justify-end text-xs text-gray-600 px-1">
           <div className="flex-1 border-t border-gray-300 mr-2" />
           <button className="flex items-center gap-1 hover:text-[#0a66c2]">

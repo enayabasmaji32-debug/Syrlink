@@ -1,10 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Bookmark, Users, Plus, Hash, Mail } from 'lucide-react';
+import { Bookmark, Users, Plus, Hash, Mail, FileText, CalendarDays, MessageSquare } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function LeftSidebar() {
-  const { user } = useApp();
+  const { user, setCreateContentType } = useApp();
   return (
     <aside className="space-y-2">
       <div className="li-card overflow-hidden">
@@ -39,6 +39,18 @@ export default function LeftSidebar() {
           <Bookmark className="w-4 h-4" />
           My items
         </Link>
+      </div>
+
+      <div className="li-card p-3 space-y-2">
+        <button onClick={() => setCreateContentType('post')} className="w-full flex items-center gap-2 px-3 py-2 bg-[#0a66c2] text-white text-xs font-semibold rounded-full hover:bg-[#004182]">
+          <MessageSquare className="w-4 h-4" /> Create Post
+        </button>
+        <button onClick={() => setCreateContentType('article')} className="w-full flex items-center gap-2 px-3 py-2 bg-[#e16745] text-white text-xs font-semibold rounded-full hover:bg-[#c85a35]">
+          <FileText className="w-4 h-4" /> Write Article
+        </button>
+        <button onClick={() => setCreateContentType('event')} className="w-full flex items-center gap-2 px-3 py-2 bg-[#c37d16] text-white text-xs font-semibold rounded-full hover:bg-[#9d6410]">
+          <CalendarDays className="w-4 h-4" /> Create Event
+        </button>
       </div>
 
       <div className="li-card p-3 text-xs">

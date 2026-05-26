@@ -83,22 +83,22 @@ export default function CreateJobSeekerRequestModal({ isOpen, onClose, onSuccess
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold">I'm Looking for a Job</h2>
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-3 sm:p-6 flex items-center justify-between shrink-0">
+          <h2 className="text-lg sm:text-xl font-bold">I'm Looking for a Job</h2>
           <button
             onClick={onClose}
             disabled={loading}
-            className="p-2 hover:bg-gray-100 rounded-full"
+            className="p-1 sm:p-2 hover:bg-gray-100 rounded-full shrink-0"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 sm:w-5 h-4 sm:h-5" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-3 sm:p-6 space-y-3 sm:space-y-4">
           {/* Job Title / Position */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-1">
+            <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
               What position are you looking for? *
             </label>
             <input
@@ -107,14 +107,14 @@ export default function CreateJobSeekerRequestModal({ isOpen, onClose, onSuccess
               value={formData.title}
               onChange={handleInputChange}
               placeholder="e.g., Frontend Engineer, Product Designer"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
               disabled={loading}
             />
           </div>
 
           {/* Skills */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-1">
+            <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
               Your Skills * (comma-separated)
             </label>
             <textarea
@@ -123,15 +123,15 @@ export default function CreateJobSeekerRequestModal({ isOpen, onClose, onSuccess
               onChange={handleInputChange}
               placeholder="e.g., React, TypeScript, Node.js, UI Design"
               rows="2"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50 resize-none"
+              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50 resize-none"
               disabled={loading}
             />
-            <p className="text-xs text-gray-500 mt-1">Separate skills with commas</p>
+            <p className="text-[11px] sm:text-xs text-gray-500 mt-1">Separate skills with commas</p>
           </div>
 
           {/* Qualifications */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-1">
+            <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
               Your Qualifications & Experience *
             </label>
             <textarea
@@ -140,14 +140,14 @@ export default function CreateJobSeekerRequestModal({ isOpen, onClose, onSuccess
               onChange={handleInputChange}
               placeholder="e.g., BS Computer Science, 3 years in web development, certifications..."
               rows="3"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50 resize-none"
+              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50 resize-none"
               disabled={loading}
             />
           </div>
 
           {/* Contact Number */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-1">
+            <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
               Contact Number *
             </label>
             <input
@@ -156,14 +156,14 @@ export default function CreateJobSeekerRequestModal({ isOpen, onClose, onSuccess
               value={formData.contact_number}
               onChange={handleInputChange}
               placeholder="e.g., +963912345678"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
               disabled={loading}
             />
           </div>
 
           {/* Location */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-1">
+            <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
               Preferred Location
             </label>
             <input
@@ -172,15 +172,15 @@ export default function CreateJobSeekerRequestModal({ isOpen, onClose, onSuccess
               value={formData.location}
               onChange={handleInputChange}
               placeholder="e.g., Damascus, Syria or Remote"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+              className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
               disabled={loading}
             />
           </div>
 
           {/* Desired Salary */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-1">
+              <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
                 Desired Salary
               </label>
               <input
@@ -189,21 +189,21 @@ export default function CreateJobSeekerRequestModal({ isOpen, onClose, onSuccess
                 value={formData.desired_salary}
                 onChange={handleInputChange}
                 placeholder="e.g., 40000"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+                className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
                 disabled={loading}
                 min="0"
                 step="1000"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-1">
+              <label className="block text-xs sm:text-sm font-semibold text-gray-900 mb-1">
                 Currency
               </label>
               <select
                 name="salary_currency"
                 value={formData.salary_currency}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
+                className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a66c2]/50"
                 disabled={loading}
               >
                 <option value="USD">USD ($)</option>
@@ -213,23 +213,23 @@ export default function CreateJobSeekerRequestModal({ isOpen, onClose, onSuccess
           </div>
 
           {/* Buttons */}
-          <div className="flex gap-2 pt-4">
+          <div className="flex flex-col sm:flex-row gap-2 pt-4">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-900 hover:bg-gray-50 disabled:opacity-50"
+              className="flex-1 px-2 sm:px-4 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm font-semibold text-gray-900 hover:bg-gray-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-4 py-2 bg-[#0a66c2] text-white rounded-lg text-sm font-semibold hover:bg-[#004182] disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 px-2 sm:px-4 py-1.5 sm:py-2 bg-[#0a66c2] text-white rounded-lg text-xs sm:text-sm font-semibold hover:bg-[#004182] disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-3 sm:w-4 h-3 sm:h-4 animate-spin" />
                   Posting...
                 </>
               ) : (
@@ -238,7 +238,7 @@ export default function CreateJobSeekerRequestModal({ isOpen, onClose, onSuccess
             </button>
           </div>
 
-          <p className="text-xs text-gray-500 text-center">
+          <p className="text-[11px] sm:text-xs text-gray-500 text-center">
             Your request will be visible to companies looking for talent with your skills and experience.
           </p>
         </form>

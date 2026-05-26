@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Search, Building2, Globe, MapPin, Plus, DollarSign } from 'lucide-react';
+import { Search, Building2, Globe, MapPin, Plus, DollarSign, Loader2 } from 'lucide-react';
 import { companiesApi } from '../api';
 import CreateCompanyModal from '../components/CreateCompanyModal';
 
@@ -10,37 +10,60 @@ export default function Companies() {
   const [companies, setCompanies] = useState([]);
   const [showInvestorsOnly, setShowInvestorsOnly] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [total, setTotal] = useState(0);
   const [skip, setSkip] = useState(0);
   const [hasMore, setHasMore] = useState(false);
-  const LIMIT = 20;
+  const LIMIT = 12;
+  const loadMoreRef = useRef(null);
 
-  const loadCompanies = async (resetPagination = true) => {
+  const loadCompanies = useCallback(async (resetPagination = true) => {
     const q = searchParams.get('q') || '';
     setQuery(q);
-    const pageSkip = resetPagination ? 0 : skip;
     
-    setLoading(true);
-    try {
-      const response = await companiesApi.list(q, pageSkip, LIMIT);
-      let items = response.data || response || [];
+    setSkip((prevSkip) => {
+      const pageSkip = resetPagination ? 0 : prevSkip;
+      const isFirstLoad = resetPagination;
+      setLoading(isFirstLoad);
+      setLoadingMore(!isFirstLoad);
       
-      if (showInvestorsOnly) {
-        items = items.filter((c) => c.is_looking_for_investors === true);
+      companiesApi.list(q, pageSkip, LIMIT)
+        .then((response) => {
+          let items = response.data || response || [];
+          
+          if (showInvestorsOnly) {
+            items = items.filter((c) => c.is_looking_for_investors === true);
+          }
+          
+          setCompanies((prevCompanies) => resetPagination ? items : [...prevCompanies, ...items]);
+          setTotal(response.total || items.length);
+          setHasMore(pageSkip + LIMIT < (response.total || 0));
+        })
+        .catch((err) => {
+          console.error('Failed to load companies:', err);
+          if (resetPagination) setCompanies([]);
+        })
+        .finally(() => {
+          setLoading(false);
+          setLoadingMore(false);
+        });
+      
+      return resetPagination ? 0 : prevSkip + LIMIT;
+    });
+  }, [searchParams, showInvestorsOnly]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+        loadCompanies(false);
       }
-      
-      setCompanies(resetPagination ? items : [...companies, ...items]);
-      setTotal(response.total || items.length);
-      setSkip(pageSkip + LIMIT);
-      setHasMore(pageSkip + LIMIT < (response.total || 0));
-    } catch (err) {
-      console.error('Failed to load companies:', err);
-      setCompanies([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    }, { threshold: 0.1 });
+
+    if (loadMoreRef.current) observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, loadCompanies]);
 
   useEffect(() => {
     setSkip(0);
@@ -207,19 +230,14 @@ export default function Companies() {
                 </div>
               </div>
             ))}
-            {!loading && hasMore && (
-              <div className="py-6 text-center">
-                <button
-                  onClick={() => loadCompanies(false)}
-                  className="px-6 py-2 bg-[#0a66c2] text-white rounded-full text-sm font-semibold hover:bg-[#004182]"
-                >
-                  Load more companies
-                </button>
-              </div>
-            )}
-            {loading && (
-              <div className="py-4 text-center text-sm text-gray-500">Loading more companies…</div>
-            )}
+            <div ref={loadMoreRef} className="py-8 text-center">
+              {loadingMore && (
+                <div className="inline-flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm text-gray-500">Loading more companies…</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </section>

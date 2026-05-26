@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Home, Users, Building2, Briefcase, MessageSquare, Bell, Search, ChevronDown, LogOut, ShieldCheck, BadgeCheck } from 'lucide-react';
+import { Home, Users, Building2, Briefcase, MessageSquare, Bell, Search, ChevronDown, LogOut, ShieldCheck, BadgeCheck, Globe } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { searchApi } from '../api';
 
@@ -26,8 +26,9 @@ function NavTab({ to, icon: Icon, label, badge }) {
 }
 
 export default function Navbar() {
-  const { user, unreadMsgCount, unreadNotifCount, logout } = useApp();
+  const { user, unreadMsgCount, unreadNotifCount, logout, language, changeLanguage } = useApp();
   const [open, setOpen] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
   const [q, setQ] = useState('');
   const [results, setResults] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -66,7 +67,7 @@ export default function Navbar() {
             data-testid="navbar-search"
           />
           {searchOpen && results && (q.trim().length > 0) && (
-            <div className="absolute top-11 left-0 right-0 w-[420px] -ml-2 bg-white rounded-lg shadow-xl border border-gray-200 max-h-[440px] overflow-y-auto z-40" data-testid="search-results">
+            <div className="absolute top-11 left-0 right-0 max-w-[90vw] sm:w-[420px] sm:-ml-2 bg-white rounded-lg shadow-xl border border-gray-200 max-h-[440px] overflow-y-auto z-40" data-testid="search-results">
               {results.users?.length > 0 && (
                 <div className="p-2">
                   <div className="text-[11px] font-bold uppercase text-gray-500 px-2">People</div>
@@ -121,6 +122,35 @@ export default function Navbar() {
           <NavTab to="/jobs" icon={Briefcase} label="Jobs" />
           <NavTab to="/messaging" icon={MessageSquare} label="Messaging" badge={unreadMsgCount} />
           <NavTab to="/notifications" icon={Bell} label="Notifications" badge={unreadNotifCount} />
+          <div className="relative ml-2">
+            <button
+              onClick={() => setLangOpen((o) => !o)}
+              className="nav-item"
+              title="Change Language"
+            >
+              <Globe className="w-6 h-6" />
+              <span className="text-[11px] leading-tight mt-0.5 uppercase font-bold">{language}</span>
+            </button>
+            {langOpen && (
+              <div
+                className="absolute right-0 top-[52px] w-32 bg-white border border-[#e0dfdc] rounded-lg shadow-lg p-2 z-40"
+                onMouseLeave={() => setLangOpen(false)}
+              >
+                <button
+                  onClick={() => { changeLanguage('ar'); setLangOpen(false); }}
+                  className={`w-full px-3 py-2 text-sm rounded hover:bg-gray-100 ${language === 'ar' ? 'font-bold text-[#0a66c2] bg-blue-50' : 'text-gray-700'}`}
+                >
+                  العربية
+                </button>
+                <button
+                  onClick={() => { changeLanguage('en'); setLangOpen(false); }}
+                  className={`w-full px-3 py-2 text-sm rounded hover:bg-gray-100 ${language === 'en' ? 'font-bold text-[#0a66c2] bg-blue-50' : 'text-gray-700'}`}
+                >
+                  English
+                </button>
+              </div>
+            )}
+          </div>
           <div className="relative">
             <button
               onClick={() => setOpen((o) => !o)}

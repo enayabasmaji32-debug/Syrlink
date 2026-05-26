@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { authApi, postsApi, companiesApi, usersApi, connectionsApi, jobsApi, messagesApi, notificationsApi } from '../api';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import translations from '../i18n/translations';
 
 const AppContext = createContext(null);
 
@@ -44,6 +45,8 @@ export function AppProvider({ children }) {
   const [appliedJobs, setAppliedJobs] = useState(new Set());
   const [conversations, setConversations] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [language, setLanguageState] = useState(localStorage.getItem('li_language') || 'ar');
+  const [createContentType, setCreateContentType] = useState(null); // 'post' | 'article' | 'event'
 
   // WebSocket for real-time online status
   const { onlineUsers, isUserOnline } = useOnlineStatus(token);
@@ -392,6 +395,20 @@ export function AppProvider({ children }) {
   const unreadNotifCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
   const unreadMsgCount = useMemo(() => conversations.filter((c) => c.unread).length, [conversations]);
 
+  // Language management
+  const changeLanguage = useCallback((lang) => {
+    if (['ar', 'en'].includes(lang)) {
+      setLanguageState(lang);
+      localStorage.setItem('li_language', lang);
+      document.documentElement.lang = lang;
+      document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    }
+  }, []);
+
+  const t = useCallback((key) => {
+    return translations[language]?.[key] || translations.en?.[key] || key;
+  }, [language]);
+
   const value = {
     user, authReady, login, register, logout, setUser,
     posts, commentsByPost, addPost, toggleLike, addComment, loadComments, repostPost, deletePost, updatePost,
@@ -403,6 +420,8 @@ export function AppProvider({ children }) {
     notifications, markNotificationRead, unreadNotifCount, unreadMsgCount,
     refreshAll,
     onlineUsers, isUserOnline,
+    language, changeLanguage, t,
+    createContentType, setCreateContentType,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

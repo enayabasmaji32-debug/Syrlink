@@ -12,7 +12,7 @@ import {
 } from './ui/dialog';
 
 export default function CreatePost({ companyId = null, companyName = null, companyLogo = null, companyOwnerId = null }) {
-  const { user, addPost, ownedCompanies, activeCompany, setActiveCompany } = useApp();
+  const { user, addPost, ownedCompanies, activeCompany, setActiveCompany, createContentType, setCreateContentType } = useApp();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [image, setImage] = useState('');
@@ -33,6 +33,21 @@ export default function CreatePost({ companyId = null, companyName = null, compa
       setPassedCompanyInfo(null);
     }
   }, [activeCompany, canPostAsCompany, companyId, companyName, companyLogo, setActiveCompany]);
+
+  // Handle content type changes from global state
+  useEffect(() => {
+    if (createContentType === 'post') {
+      setOpen(true);
+    }
+  }, [createContentType]);
+
+  // Close modal and reset content type when modal closes
+  const handleOpenChange = (newOpen) => {
+    setOpen(newOpen);
+    if (!newOpen) {
+      setCreateContentType(null);
+    }
+  };
 
   const selectedCompany = ownedCompanies?.find((c) => c.id === selectedCompanyId) || passedCompanyInfo || null;
 
@@ -128,7 +143,7 @@ export default function CreatePost({ companyId = null, companyName = null, compa
         </button>
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <div className="flex items-center gap-2">
