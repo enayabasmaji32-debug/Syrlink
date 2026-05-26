@@ -4,7 +4,7 @@ import { Bookmark, Users, Plus, Hash, Mail, FileText, CalendarDays, MessageSquar
 import { useApp } from '../context/AppContext';
 
 export default function LeftSidebar() {
-  const { user, setCreateContentType } = useApp();
+  const { user, setCreateContentType, t } = useApp();
   return (
     <aside className="space-y-2">
       <div className="li-card overflow-hidden">
@@ -23,52 +23,52 @@ export default function LeftSidebar() {
         </div>
         <div className="px-4 py-2 border-t border-[#e0dfdc] text-xs space-y-1">
           <div className="flex justify-between hover:bg-gray-100 rounded px-1 py-1 cursor-pointer">
-            <span className="text-gray-600">Profile viewers</span>
+            <span className="text-gray-600">{t('profileViewers')}</span>
             <span className="font-semibold text-[#0a66c2]">—</span>
           </div>
           <div className="flex justify-between hover:bg-gray-100 rounded px-1 py-1 cursor-pointer">
-            <span className="text-gray-600">Post impressions</span>
+            <span className="text-gray-600">{t('postImpressions')}</span>
             <span className="font-semibold text-[#0a66c2]">—</span>
           </div>
         </div>
         <div className="px-4 py-2 border-t border-[#e0dfdc]">
-          <div className="text-[11px] text-gray-500">Strengthen your profile with an AI writing assistant</div>
-          <button className="text-xs font-semibold mt-1 hover:underline">Try Premium for $0</button>
+          <div className="text-[11px] text-gray-500">{t('strengthenProfile')}</div>
+          <button className="text-xs font-semibold mt-1 hover:underline">{t('tryPremium')}</button>
         </div>
         <Link to="/me" className="flex items-center gap-2 px-4 py-2 border-t border-[#e0dfdc] text-xs font-semibold text-gray-700 hover:bg-gray-100">
           <Bookmark className="w-4 h-4" />
-          My items
+          {t('myItems')}
         </Link>
       </div>
 
       <div className="li-card p-3 space-y-2">
         <button onClick={() => setCreateContentType('post')} className="w-full flex items-center gap-2 px-3 py-2 bg-[#0a66c2] text-white text-xs font-semibold rounded-full hover:bg-[#004182]">
-          <MessageSquare className="w-4 h-4" /> Create Post
+          <MessageSquare className="w-4 h-4" /> {t('createPost')}
         </button>
         <button onClick={() => setCreateContentType('article')} className="w-full flex items-center gap-2 px-3 py-2 bg-[#e16745] text-white text-xs font-semibold rounded-full hover:bg-[#c85a35]">
-          <FileText className="w-4 h-4" /> Write Article
+          <FileText className="w-4 h-4" /> {t('writeArticle')}
         </button>
         <button onClick={() => setCreateContentType('event')} className="w-full flex items-center gap-2 px-3 py-2 bg-[#c37d16] text-white text-xs font-semibold rounded-full hover:bg-[#9d6410]">
-          <CalendarDays className="w-4 h-4" /> Create Event
+          <CalendarDays className="w-4 h-4" /> {t('createEvent')}
         </button>
       </div>
 
       <div className="li-card p-3 text-xs">
         <Link to="/groups" className="flex items-center justify-between px-1 py-1 text-gray-600 hover:text-[#0a66c2] font-semibold">
-          <span className="flex items-center gap-2"><Users className="w-4 h-4" /> Groups</span>
+          <span className="flex items-center gap-2"><Users className="w-4 h-4" /> {t('groups')}</span>
         </Link>
         <Link to="/events" className="flex items-center justify-between px-1 py-1 text-gray-600 hover:text-[#0a66c2] font-semibold mt-1">
-          <span className="flex items-center gap-2"><Hash className="w-4 h-4" /> Events</span>
+          <span className="flex items-center gap-2"><Hash className="w-4 h-4" /> {t('events')}</span>
           <Plus className="w-4 h-4" />
         </Link>
         <Link to="/hashtags" className="flex items-center justify-between px-1 py-1 text-gray-600 hover:text-[#0a66c2] font-semibold mt-1">
-          <span className="flex items-center gap-2"><Hash className="w-4 h-4" /> Followed Hashtags</span>
+          <span className="flex items-center gap-2"><Hash className="w-4 h-4" /> {t('followedHashtags')}</span>
         </Link>
         <Link to="/position-requests" className="flex items-center justify-between px-1 py-1 text-gray-600 hover:text-[#0a66c2] font-semibold mt-1">
-          <span className="flex items-center gap-2"><Mail className="w-4 h-4" /> Position Requests</span>
+          <span className="flex items-center gap-2"><Mail className="w-4 h-4" /> {t('positionRequests')}</span>
         </Link>
         <div className="border-t border-[#e0dfdc] mt-2 pt-2 text-center font-semibold text-gray-600 hover:bg-gray-100 rounded py-1 cursor-pointer">
-          Discover more
+          {t('discoverMore')}
         </div>
       </div>
     </aside>

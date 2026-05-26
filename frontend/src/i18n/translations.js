@@ -67,6 +67,30 @@ const translations = {
     success: 'تم بنجاح',
     error: 'حدث خطأ',
     tryAgain: 'حاول مرة أخرى',
+    
+    // Search & Navigation
+    search: 'بحث عن SyrLink',
+    people: 'أشخاص',
+    posts: 'منشورات',
+    noResults: 'لا توجد نتائج لـ',
+    viewProfile: 'عرض الملف الشخصي',
+    myCompanyRequests: 'طلباتي للشركات',
+    myApplications: 'طلباتي للوظائف',
+    
+    // Sidebar
+    profileViewers: 'زوار الملف الشخصي',
+    postImpressions: 'انطباعات المنشور',
+    myItems: 'عناصري',
+    strengthenProfile: 'قوي ملفك الشخصي بمساعد الكتابة الذكي',
+    tryPremium: 'جرب Premium مجاناً',
+    createPost: 'نشر بوست',
+    writeArticle: 'نشر مقالة',
+    createEvent: 'إنشاء حدث',
+    groups: 'المجموعات',
+    events: 'الأحداث',
+    followedHashtags: 'الهاشتاجات المتابعة',
+    positionRequests: 'طلبات المواضع',
+    discoverMore: 'اكتشف المزيد',
   },
   en: {
     // Navigation
@@ -134,6 +158,30 @@ const translations = {
     success: 'Success',
     error: 'An error occurred',
     tryAgain: 'Try again',
+    
+    // Search & Navigation
+    search: 'Search SyrLink',
+    people: 'People',
+    posts: 'Posts',
+    noResults: 'No results for',
+    viewProfile: 'View Profile',
+    myCompanyRequests: 'My Company Requests',
+    myApplications: 'My Applications',
+    
+    // Sidebar
+    profileViewers: 'Profile viewers',
+    postImpressions: 'Post impressions',
+    myItems: 'My items',
+    strengthenProfile: 'Strengthen your profile with an AI writing assistant',
+    tryPremium: 'Try Premium for $0',
+    createPost: 'Create Post',
+    writeArticle: 'Write Article',
+    createEvent: 'Create Event',
+    groups: 'Groups',
+    events: 'Events',
+    followedHashtags: 'Followed Hashtags',
+    positionRequests: 'Position Requests',
+    discoverMore: 'Discover more',
   },
 };
 

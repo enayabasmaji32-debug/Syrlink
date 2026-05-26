@@ -26,7 +26,7 @@ function NavTab({ to, icon: Icon, label, badge }) {
 }
 
 export default function Navbar() {
-  const { user, unreadMsgCount, unreadNotifCount, logout, language, changeLanguage } = useApp();
+  const { user, unreadMsgCount, unreadNotifCount, logout, language, changeLanguage, t } = useApp();
   const [open, setOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -59,7 +59,7 @@ export default function Navbar() {
         <div className="relative ml-1 flex-1 max-w-[280px]" ref={searchRef}>
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input
-            placeholder="Search SyrLink"
+            placeholder={t('search') || "Search SyrLink"}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onFocus={() => setSearchOpen(true)}
@@ -70,7 +70,7 @@ export default function Navbar() {
             <div className="absolute top-11 left-0 right-0 max-w-[90vw] sm:w-[420px] sm:-ml-2 bg-white rounded-lg shadow-xl border border-gray-200 max-h-[440px] overflow-y-auto z-40" data-testid="search-results">
               {results.users?.length > 0 && (
                 <div className="p-2">
-                  <div className="text-[11px] font-bold uppercase text-gray-500 px-2">People</div>
+                  <div className="text-[11px] font-bold uppercase text-gray-500 px-2">{t('people') || 'People'}</div>
                   {results.users.map((u) => (
                     <Link key={u.id} to={`/in/${u.id}`} onClick={() => { setSearchOpen(false); setQ(''); }}
                       className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 rounded" data-testid={`search-user-${u.id}`}>
@@ -85,7 +85,7 @@ export default function Navbar() {
               )}
               {results.jobs?.length > 0 && (
                 <div className="p-2 border-t border-gray-100">
-                  <div className="text-[11px] font-bold uppercase text-gray-500 px-2">Jobs</div>
+                  <div className="text-[11px] font-bold uppercase text-gray-500 px-2">{t('jobs') || 'Jobs'}</div>
                   {results.jobs.map((j) => (
                     <Link key={j.id} to="/jobs" onClick={() => { setSearchOpen(false); setQ(''); }}
                       className="flex items-center gap-2 px-2 py-2 hover:bg-gray-100 rounded">
@@ -100,7 +100,7 @@ export default function Navbar() {
               )}
               {results.posts?.length > 0 && (
                 <div className="p-2 border-t border-gray-100">
-                  <div className="text-[11px] font-bold uppercase text-gray-500 px-2">Posts</div>
+                  <div className="text-[11px] font-bold uppercase text-gray-500 px-2">{t('posts') || 'Posts'}</div>
                   {results.posts.map((p) => (
                     <div key={p.id} className="px-2 py-2 hover:bg-gray-100 rounded">
                       <div className="text-xs font-semibold text-gray-700">{p.author?.name}</div>
@@ -110,18 +110,18 @@ export default function Navbar() {
                 </div>
               )}
               {!results.users?.length && !results.jobs?.length && !results.posts?.length && (
-                <div className="p-4 text-center text-sm text-gray-500">No results for "{q}"</div>
+                <div className="p-4 text-center text-sm text-gray-500">{t('noResults') || 'No results'} "{q}"</div>
               )}
             </div>
           )}
         </div>
         <nav className="flex items-center ml-auto h-full">
-          <NavTab to="/" icon={Home} label="Home" />
-          <NavTab to="/mynetwork" icon={Users} label="Network" />
-          <NavTab to="/companies" icon={Building2} label="Companies" />
-          <NavTab to="/jobs" icon={Briefcase} label="Jobs" />
-          <NavTab to="/messaging" icon={MessageSquare} label="Messaging" badge={unreadMsgCount} />
-          <NavTab to="/notifications" icon={Bell} label="Notifications" badge={unreadNotifCount} />
+          <NavTab to="/" icon={Home} label={t('home')} />
+          <NavTab to="/mynetwork" icon={Users} label={t('myNetwork')} />
+          <NavTab to="/companies" icon={Building2} label={t('companies')} />
+          <NavTab to="/jobs" icon={Briefcase} label={t('jobs')} />
+          <NavTab to="/messaging" icon={MessageSquare} label={t('messaging')} badge={unreadMsgCount} />
+          <NavTab to="/notifications" icon={Bell} label={t('notifications')} badge={unreadNotifCount} />
           <div className="relative ml-2">
             <button
               onClick={() => setLangOpen((o) => !o)}
@@ -185,20 +185,20 @@ export default function Navbar() {
                   className="mt-3 block w-full text-center border border-[#0a66c2] text-[#0a66c2] rounded-full text-sm font-semibold py-1 hover:bg-[#0a66c2]/10"
                   data-testid="navbar-view-profile"
                 >
-                  View Profile
+                  {t('viewProfile') || 'View Profile'}
                 </Link>
                 <Link to="/my-company-requests" onClick={() => setOpen(false)} data-testid="navbar-company-requests-link"
                   className="mt-2 w-full flex items-center justify-center gap-2 text-sm text-gray-700 hover:bg-gray-100 rounded py-1.5 font-semibold">
-                  <Briefcase className="w-4 h-4" /> My Company Requests
+                  <Briefcase className="w-4 h-4" /> {t('myCompanyRequests') || 'My Company Requests'}
                 </Link>
                 <Link to="/my-applications" onClick={() => setOpen(false)} data-testid="navbar-my-applications-link"
                   className="mt-2 w-full flex items-center justify-center gap-2 text-sm text-gray-700 hover:bg-gray-100 rounded py-1.5 font-semibold">
-                  <Briefcase className="w-4 h-4" /> My Applications
+                  <Briefcase className="w-4 h-4" /> {t('myApplications') || 'My Applications'}
                 </Link>
                 {user?.is_admin && (
                   <Link to="/admin" onClick={() => setOpen(false)} data-testid="navbar-admin-link"
                     className="mt-2 w-full flex items-center justify-center gap-2 text-sm text-red-700 hover:bg-red-50 rounded py-1.5 font-semibold">
-                    <ShieldCheck className="w-4 h-4" /> Admin Panel
+                    <ShieldCheck className="w-4 h-4" /> {t('admin') || 'Admin Panel'}
                   </Link>
                 )}
                 <button
@@ -206,7 +206,7 @@ export default function Navbar() {
                   className="mt-2 w-full flex items-center justify-center gap-2 text-sm text-gray-700 hover:bg-gray-100 rounded py-1.5 font-semibold"
                   data-testid="navbar-logout"
                 >
-                  <LogOut className="w-4 h-4" /> Sign out
+                  <LogOut className="w-4 h-4" /> {t('logout') || 'Sign out'}
                 </button>
               </div>
             )}
