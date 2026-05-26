@@ -1,9 +1,13 @@
 """Utility functions."""
 import uuid
+import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 from app.database import db
+
+# Configure logger
+log = logging.getLogger(__name__)
 
 
 def now_iso() -> str:
