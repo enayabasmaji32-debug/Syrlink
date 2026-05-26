@@ -73,7 +73,7 @@ async def batch_fetch_users(author_ids: List[str]) -> Dict[str, Dict[str, Any]]:
 async def list_posts(cursor: Optional[str] = None, limit: int = 5, company_id: Optional[str] = None, current=Depends(get_current_user)):
     """List posts with pagination (optimized for speed)."""
     # Cap limit to prevent slow queries
-    limit = min(limit, 20)
+    limit = min(max(limit, 1), 20)
     
     query: Dict[str, Any] = {}
     if cursor:
@@ -81,19 +81,23 @@ async def list_posts(cursor: Optional[str] = None, limit: int = 5, company_id: O
     if company_id:
         query["company_id"] = company_id
     
-    posts = await db.posts.find(query, {
-        "_id": 0, 
-        "id": 1, 
-        "author_id": 1, 
-        "company_id": 1,
-        "content": 1, 
-        "image": 1, 
-        "visibility": 1,
-        "likes_count": 1, 
-        "comments_count": 1, 
-        "reposts_count": 1,
-        "created_at": 1,
-    }).sort("created_at", -1).limit(limit).to_list(limit)
+    try:
+        posts = await db.posts.find(query, {
+            "_id": 0, 
+            "id": 1, 
+            "author_id": 1, 
+            "company_id": 1,
+            "content": 1, 
+            "image": 1, 
+            "visibility": 1,
+            "likes_count": 1, 
+            "comments_count": 1, 
+            "reposts_count": 1,
+            "created_at": 1,
+        }).sort("created_at", -1).limit(limit).to_list(limit)
+    except Exception as e:
+        log.error(f"Error fetching posts: {e}")
+        return {"items": [], "next_cursor": None}
     
     if not posts:
         return {"items": [], "next_cursor": None}

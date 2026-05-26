@@ -156,7 +156,6 @@ export default function Login() {
           <a href="/nda" target="_blank" rel="noopener noreferrer" className="text-[#0a66c2] hover:underline">اتفاقية عدم الإفصاح (NDA)</a>
         </div>
       </div>
-      <p className="text-xs text-gray-500 mt-4">Demo: demo@syrlink.com / demo1234</p>
       {!cookieConsent && showCookieModal && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-3xl px-4">
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-4 flex items-center gap-4 text-right">

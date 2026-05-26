@@ -107,9 +107,14 @@ export function AppProvider({ children }) {
       jobsApi.saved().then((ids) => setSavedJobs(new Set(ids || []))).catch(() => {}),
       messagesApi.conversations().then(setConversations).catch(() => {}),
     ]);
-  }, [user]);
+  }, []);
 
-  useEffect(() => { refreshAll(); }, [refreshAll]);
+  // Only refresh when user first becomes available (prevents unnecessary re-renders on every user object mutation)
+  useEffect(() => { 
+    if (user) { 
+      refreshAll(user); 
+    } 
+  }, [user?.id]);
 
   const activeCompany = useMemo(
     () => ownedCompanies.find((c) => c.id === activeCompanyId) || null,
@@ -157,25 +162,51 @@ export function AppProvider({ children }) {
     loadOwnedCompanies();
   }, [user, loadOwnedCompanies]);
 
-  // Load notifications when user changes
+  // Load notifications when user changes (only on mount and when user changes, polling with reduced frequency)
   useEffect(() => {
     if (!user) {
       setNotifications([]);
       return;
     }
+
+    // Load initial notifications
     notificationsApi.list()
       .then(setNotifications)
       .catch((e) => console.error('Failed loading notifications', e));
     
-    // Poll for new notifications every 10 seconds
-    const interval = setInterval(() => {
-      notificationsApi.list()
-        .then(setNotifications)
-        .catch(() => {});
-    }, 10000);
+    // Only poll if tab is focused (reduce server load)
+    let interval = null;
+    const handleVisibilityChange = () => {
+      if (!document.hidden && !interval) {
+        // Resume polling
+        interval = setInterval(() => {
+          notificationsApi.list()
+            .then(setNotifications)
+            .catch(() => {});
+        }, 45000); // Poll every 45 seconds (increased from 30s for less load)
+      } else if (document.hidden && interval) {
+        // Pause polling
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    // Start polling only if visible
+    if (!document.hidden) {
+      interval = setInterval(() => {
+        notificationsApi.list()
+          .then(setNotifications)
+          .catch(() => {});
+      }, 45000);
+    }
     
-    return () => clearInterval(interval);
-  }, [user]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user?.id]); // Only depend on user.id to prevent recreating interval
 
   const login = async (email, password) => {
     const { token, user: u } = await authApi.login({ email, password });
@@ -183,10 +214,8 @@ export function AppProvider({ children }) {
     setCookie('li_cookie_consent', 'yes', { maxAge: 31536000 });
     setToken(token);
     setUser(u);
-    setTimeout(() => {
-      refreshAll(u);
-      loadOwnedCompanies(u);
-    }, 200);
+    // Defer non-critical data loading to avoid blocking UI
+    Promise.allSettled([refreshAll(u), loadOwnedCompanies(u)]);
     return u;
   };
 
@@ -196,10 +225,8 @@ export function AppProvider({ children }) {
     setCookie('li_cookie_consent', 'yes', { maxAge: 31536000 });
     setToken(token);
     setUser(u);
-    setTimeout(() => {
-      refreshAll(u);
-      loadOwnedCompanies(u);
-    }, 200);
+    // Defer non-critical data loading to avoid blocking UI
+    Promise.allSettled([refreshAll(u), loadOwnedCompanies(u)]);
     return u;
   };
 
@@ -395,19 +422,25 @@ export function AppProvider({ children }) {
   const unreadNotifCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
   const unreadMsgCount = useMemo(() => conversations.filter((c) => c.unread).length, [conversations]);
 
-  // Language management
+  // Language management - use useMemo to prevent translation function re-creation
+  const translationMemo = useMemo(() => translations[language] || translations.en, [language]);
+  
   const changeLanguage = useCallback((lang) => {
-    if (['ar', 'en'].includes(lang)) {
+    if (['ar', 'en'].includes(lang) && lang !== language) {
       setLanguageState(lang);
       localStorage.setItem('li_language', lang);
-      document.documentElement.lang = lang;
-      document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+      // Batch DOM updates to prevent reflow
+      requestAnimationFrame(() => {
+        document.documentElement.lang = lang;
+        document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+      });
     }
-  }, []);
-
-  const t = useCallback((key) => {
-    return translations[language]?.[key] || translations.en?.[key] || key;
   }, [language]);
+
+  // Memoized translation function to prevent unnecessary re-renders
+  const t = useCallback((key) => {
+    return translationMemo?.[key] || translations.en?.[key] || key;
+  }, [translationMemo]);
 
   const value = {
     user, authReady, login, register, logout, setUser,

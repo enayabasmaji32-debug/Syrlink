@@ -10,9 +10,13 @@ const client = axios.create({
   withCredentials: true,
 });
 
-// Retry configuration
+// Retry configuration with request-level tracking
 const MAX_RETRIES = 3;
-let retryCount = {};
+const RETRY_CONFIG = new WeakMap();
+
+const getRetryKey = (config) => {
+  return `${config.method}-${config.url}`;
+};
 
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem('li_token');
@@ -20,13 +24,17 @@ client.interceptors.request.use((config) => {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // Initialize retry counter for this specific request
+  if (!config.retryCount) {
+    config.retryCount = 0;
+  }
   return config;
 });
 
 client.interceptors.response.use(
   (r) => {
     // Clear retry count on success
-    retryCount[r.config.url] = 0;
+    r.config.retryCount = 0;
     return r;
   },
   async (err) => {
@@ -41,12 +49,12 @@ client.interceptors.response.use(
     
     // If 502/503 (gateway/service unavailable), retry
     if ((err?.response?.status === 502 || err?.response?.status === 503) && 
-        (!retryCount[err.config.url] || retryCount[err.config.url] < MAX_RETRIES)) {
-      retryCount[err.config.url] = (retryCount[err.config.url] || 0) + 1;
-      console.warn(`Server unavailable (${err.response.status}), retrying (attempt ${retryCount[err.config.url]}/${MAX_RETRIES})`);
+        (!err.config.retryCount || err.config.retryCount < MAX_RETRIES)) {
+      err.config.retryCount = (err.config.retryCount || 0) + 1;
+      console.warn(`Server unavailable (${err.response.status}), retrying (attempt ${err.config.retryCount}/${MAX_RETRIES})`);
       
       // Wait before retrying (exponential backoff)
-      await new Promise(resolve => setTimeout(resolve, 1000 * retryCount[err.config.url]));
+      await new Promise(resolve => setTimeout(resolve, 1000 * err.config.retryCount));
       return client.request(err.config);
     }
     
@@ -59,12 +67,12 @@ client.interceptors.response.use(
     }
     
     // Retry logic for timeout errors
-    if (err.code === 'ECONNABORTED' && (!retryCount[err.config.url] || retryCount[err.config.url] < MAX_RETRIES)) {
-      retryCount[err.config.url] = (retryCount[err.config.url] || 0) + 1;
-      console.warn(`Retrying request (attempt ${retryCount[err.config.url]}/${MAX_RETRIES})`);
+    if (err.code === 'ECONNABORTED' && (!err.config.retryCount || err.config.retryCount < MAX_RETRIES)) {
+      err.config.retryCount = (err.config.retryCount || 0) + 1;
+      console.warn(`Retrying request (attempt ${err.config.retryCount}/${MAX_RETRIES})`);
       
       // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, 1000 * retryCount[err.config.url]));
+      await new Promise(resolve => setTimeout(resolve, 1000 * err.config.retryCount));
       return client.request(err.config);
     }
     

@@ -35,7 +35,7 @@ app = FastAPI(title="SyrLink API", version="1.0.0")
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 
-# Add CORS middleware
+# Add CORS middleware with timeout
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -43,6 +43,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add timeout middleware to prevent hanging connections
+from fastapi.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+import time
+
+class TimeoutMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, timeout=30):
+        super().__init__(app)
+        self.timeout = timeout
+
+    async def dispatch(self, request, call_next):
+        try:
+            start_time = time.time()
+            response = await asyncio.wait_for(call_next(request), timeout=self.timeout)
+            return response
+        except asyncio.TimeoutError:
+            return JSONResponse(
+                status_code=504,
+                content={"detail": "Request timeout - gateway timeout"}
+            )
 
 # Add rate limit exception handler
 @app.exception_handler(RateLimitExceeded)

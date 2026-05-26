@@ -88,7 +88,7 @@ async def list_invitations(current=Depends(get_current_user)):
         }
         for inv in invs
     ]
-    log.info(f"[/invitations] Returning: {out}")
+    log.info(f"[/invitations] Returning {len(out)} invitations")
     return out
 
 
@@ -185,7 +185,7 @@ async def my_connections(current=Depends(get_current_user)):
 @router.get("/network")
 async def network_users(current=Depends(get_current_user)):
     """Get ALL users with current relationship status for network discovery."""
-    log.info(f"[/network] Fetching all users for user: {current['id']}")
+    log.debug("[/network] Fetching network data for current user")
     
     # Get all relationship statuses
     relations = await db.connections.find(
@@ -210,7 +210,7 @@ async def network_users(current=Depends(get_current_user)):
             else:
                 status_map[other_id] = {"relationship": "pending_received", "connection_id": relation["id"]}
 
-    log.info(f"[/network] Found {len(status_map)} relationships")
+    log.debug(f"[/network] Found {len(status_map)} relationships")
 
     # Fetch ALL users except current user
     all_users = await db.users.find(
@@ -218,7 +218,7 @@ async def network_users(current=Depends(get_current_user)):
         {"_id": 0, "id": 1, "name": 1, "avatar": 1, "headline": 1, "cover": 1, "verified": 1}
     ).to_list(10000)
 
-    log.info(f"[/network] Found {len(all_users)} total users (excluding current user)")
+    log.debug(f"[/network] Found {len(all_users)} total users")
 
     out = []
     for user in all_users:

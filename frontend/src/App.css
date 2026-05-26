@@ -18,6 +18,89 @@
   --li-amber: #b24020;
 }
 
+/* RTL Support */
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] .text-left {
+  text-align: right;
+}
+
+[dir="rtl"] .text-right {
+  text-align: left;
+}
+
+[dir="rtl"] .float-left {
+  float: right;
+}
+
+[dir="rtl"] .float-right {
+  float: left;
+}
+
+[dir="rtl"] .ml-1 {
+  margin-right: 0.25rem;
+  margin-left: 0;
+}
+
+[dir="rtl"] .ml-2 {
+  margin-right: 0.5rem;
+  margin-left: 0;
+}
+
+[dir="rtl"] .ml-auto {
+  margin-right: auto;
+  margin-left: 0;
+}
+
+[dir="rtl"] .mr-auto {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+[dir="rtl"] .pl-9 {
+  padding-right: 2.25rem;
+  padding-left: 0;
+}
+
+[dir="rtl"] .pl-3 {
+  padding-right: 0.75rem;
+  padding-left: 0;
+}
+
+[dir="rtl"] .pr-3 {
+  padding-left: 0.75rem;
+  padding-right: 0;
+}
+
+[dir="rtl"] .left-3 {
+  right: 0.75rem;
+  left: auto;
+}
+
+[dir="rtl"] .left-0 {
+  right: 0;
+  left: auto;
+}
+
+[dir="rtl"] .right-0 {
+  left: 0;
+  right: auto;
+}
+
+[dir="rtl"] .-ml-2 {
+  margin-right: -0.5rem;
+  margin-left: 0;
+}
+
+/* Fix navbar active indicator for RTL */
+[dir="rtl"] .nav-item.active::after {
+  right: 0;
+  left: auto;
+}
+
 body {
   font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   color: var(--li-text);
