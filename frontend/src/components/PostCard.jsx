@@ -43,12 +43,20 @@ const PostCardComponent = ({ post }) => {
   const [editOpen, setEditOpen] = useState(false);
   const [editContent, setEditContent] = useState(post.content || '');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null); // Comment ID we're replying to
   const comments = commentsByPost[post.id] || [];
 
   const onLike = () => {
     toggleLike(post.id);
     setPop(true);
     setTimeout(() => setPop(false), 300);
+  };
+
+  const onReaction = (reactionType) => {
+    toggleLike(post.id, reactionType);
+    setPop(true);
+    setTimeout(() => setPop(false), 300);
+    setShowReactions(false);
   };
 
   const onSimpleRepost = async () => {
@@ -231,7 +239,7 @@ const PostCardComponent = ({ post }) => {
               {REACTIONS.map((r) => (
                 <button
                   key={r.key}
-                  onClick={onLike}
+                  onClick={() => onReaction(r.key)}
                   className={`p-2 rounded-full hover:scale-125 transition-transform ${r.color}`}
                   title={r.label}
                 >
@@ -267,25 +275,51 @@ const PostCardComponent = ({ post }) => {
       {/* Comments */}
       {showComments && (
         <div className="px-4 pb-3 border-t border-[#e0dfdc] pt-3 space-y-3">
-          <CommentBox onSubmit={(t) => addComment(post.id, t)} />
-          {comments.map((c) => (
-            <div key={c.id} className="flex gap-2">
-              <img src={c.author.avatar} alt={c.author.name} className="w-8 h-8 rounded-full object-cover" />
-              <div className="flex-1">
-                <div className="bg-gray-100 rounded-lg px-3 py-2">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="font-semibold text-sm">{c.author.name}</span>
-                    <span className="text-[11px] text-gray-500">{c.timeAgo}</span>
+          <CommentBox onSubmit={(t) => { addComment(post.id, t, replyingTo); setReplyingTo(null); }} />
+          {replyingTo && (
+            <div className="text-xs text-gray-500 px-2">Replying to comment • <button onClick={() => setReplyingTo(null)} className="text-[#0a66c2] hover:underline">Cancel</button></div>
+          )}
+          {comments.filter((c) => !c.parent_comment_id).map((c) => (
+            <div key={c.id}>
+              <div className="flex gap-2">
+                <img src={c.author.avatar} alt={c.author.name} className="w-8 h-8 rounded-full object-cover" />
+                <div className="flex-1">
+                  <div className="bg-gray-100 rounded-lg px-3 py-2">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="font-semibold text-sm">{c.author.name}</span>
+                      <span className="text-[11px] text-gray-500">{c.timeAgo}</span>
+                    </div>
+                    <p className="text-xs text-gray-600 line-clamp-1">{c.author.headline}</p>
+                    <p className="text-sm mt-1">{c.text}</p>
                   </div>
-                  <p className="text-xs text-gray-600 line-clamp-1">{c.author.headline}</p>
-                  <p className="text-sm mt-1">{c.text}</p>
-                </div>
-                <div className="flex items-center gap-3 text-xs text-gray-600 mt-1 px-2">
-                  <button className="font-semibold hover:underline">Like</button>
-                  <button className="font-semibold hover:underline">Reply</button>
-                  {c.likes > 0 && <span>· {c.likes} likes</span>}
+                  <div className="flex items-center gap-3 text-xs text-gray-600 mt-1 px-2">
+                    <button className="font-semibold hover:underline">Like</button>
+                    <button onClick={() => setReplyingTo(c.id)} className="font-semibold hover:underline">Reply</button>
+                    {c.likes > 0 && <span>· {c.likes} likes</span>}
+                  </div>
                 </div>
               </div>
+              
+              {/* Nested replies */}
+              {comments.filter((reply) => reply.parent_comment_id === c.id).map((reply) => (
+                <div key={reply.id} className="ml-6 mt-2 flex gap-2">
+                  <img src={reply.author.avatar} alt={reply.author.name} className="w-6 h-6 rounded-full object-cover" />
+                  <div className="flex-1">
+                    <div className="bg-gray-50 rounded px-2 py-1">
+                      <div className="flex items-baseline justify-between gap-1">
+                        <span className="font-semibold text-xs">{reply.author.name}</span>
+                        <span className="text-[10px] text-gray-500">{reply.timeAgo}</span>
+                      </div>
+                      <p className="text-xs mt-0.5">{reply.text}</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-600 mt-0.5 px-1">
+                      <button className="font-semibold hover:underline text-xs">Like</button>
+                      <button onClick={() => setReplyingTo(c.id)} className="font-semibold hover:underline text-xs">Reply</button>
+                      {reply.likes > 0 && <span>· {reply.likes}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ))}
         </div>

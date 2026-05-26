@@ -1,13 +1,13 @@
 """Posts and feed routes."""
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Literal
 import asyncio
 from fastapi import APIRouter, HTTPException, Depends, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from app.models import PostIn, CommentIn, RepostIn
+from app.models import PostIn, CommentIn, ReactionIn, RepostIn
 from app.security import get_current_user
-from app.utils import uid, now_iso, time_ago, fetch_user_brief, create_notification
+from app.utils import uid, now_iso, time_ago, fetch_user_brief, create_notification, log
 from app.database import db
 
 router = APIRouter(prefix="/posts", tags=["posts"])
@@ -273,6 +273,69 @@ async def toggle_like(post_id: str, current=Depends(get_current_user)):
     }
 
 
+@router.post("/{post_id}/reaction")
+async def add_reaction(post_id: str, data: ReactionIn, current=Depends(get_current_user)):
+    """Add or update a reaction on a post (celebrate, support, insightful, etc)."""
+    post = await db.posts.find_one({"id": post_id})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    reaction_type = data.reaction_type or "like"
+    
+    # Check if user already has a reaction on this post
+    existing = await db.post_likes.find_one({"post_id": post_id, "user_id": current["id"]})
+    
+    if existing:
+        # Update existing reaction
+        old_reaction = existing.get("reaction", "like")
+        if old_reaction == reaction_type:
+            # Same reaction clicked again - remove it
+            await db.post_likes.delete_one({"_id": existing["_id"]})
+            log.debug(f"[reaction] Removed {reaction_type} on post {post_id}")
+            return {"id": post_id, "reaction": None, "count": post.get("likes_count", 0) - 1}
+        else:
+            # Different reaction - update it
+            await db.post_likes.update_one(
+                {"_id": existing["_id"]},
+                {"$set": {"reaction": reaction_type, "updated_at": now_iso()}}
+            )
+            log.debug(f"[reaction] Updated reaction to {reaction_type} on post {post_id}")
+    else:
+        # New reaction
+        await db.post_likes.insert_one({
+            "id": uid(),
+            "post_id": post_id,
+            "user_id": current["id"],
+            "reaction": reaction_type,
+            "created_at": now_iso(),
+        })
+        await db.posts.update_one({"id": post_id}, {"$inc": {"likes_count": 1}})
+        
+        # Notify post author on any reaction
+        if post["author_id"] != current["id"]:
+            reaction_text = {
+                "celebrate": "celebrated your post",
+                "support": "showed support for your post",
+                "insightful": "found your post insightful",
+            }.get(reaction_type, "reacted to your post")
+            
+            await create_notification(
+                user_id=post["author_id"],
+                actor_id=current["id"],
+                ntype=reaction_type,
+                text=reaction_text,
+                target_id=post_id,
+            )
+        
+        log.debug(f"[reaction] Added {reaction_type} on post {post_id}")
+    
+    return {
+        "id": post_id,
+        "reaction": reaction_type,
+        "count": post.get("likes_count", 0),
+    }
+
+
 @router.get("/{post_id}/comments")
 async def list_comments(post_id: str, current=Depends(get_current_user)):
     """List comments on a post."""
@@ -301,10 +364,17 @@ async def list_comments(post_id: str, current=Depends(get_current_user)):
 
 @router.post("/{post_id}/comments")
 async def add_comment(post_id: str, data: CommentIn, current=Depends(get_current_user)):
-    """Add a comment to a post."""
+    """Add a comment or reply to a post."""
     post = await db.posts.find_one({"id": post_id})
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
+    
+    # If this is a reply to another comment, verify parent exists
+    parent_comment = None
+    if data.parent_comment_id:
+        parent_comment = await db.comments.find_one({"id": data.parent_comment_id, "post_id": post_id})
+        if not parent_comment:
+            raise HTTPException(status_code=404, detail="Parent comment not found")
     
     doc = {
         "id": uid(),
@@ -312,17 +382,30 @@ async def add_comment(post_id: str, data: CommentIn, current=Depends(get_current
         "author_id": current["id"],
         "text": data.text,
         "likes_count": 0,
+        "parent_comment_id": data.parent_comment_id,  # None if top-level, comment ID if reply
         "created_at": now_iso(),
     }
     await db.comments.insert_one(doc)
     await db.posts.update_one({"id": post_id}, {"$inc": {"comments_count": 1}})
     
-    if post["author_id"] != current["id"]:
+    # Send notifications
+    # 1. Notify post author if this is a top-level comment
+    if not data.parent_comment_id and post["author_id"] != current["id"]:
         await create_notification(
             user_id=post["author_id"],
             actor_id=current["id"],
             ntype="comment",
             text=f'commented on your post: "{data.text[:60]}"',
+            target_id=post_id,
+        )
+    
+    # 2. Notify parent comment author if this is a reply
+    if data.parent_comment_id and parent_comment["author_id"] != current["id"]:
+        await create_notification(
+            user_id=parent_comment["author_id"],
+            actor_id=current["id"],
+            ntype="reply",
+            text=f'replied to your comment: "{data.text[:60]}"',
             target_id=post_id,
         )
     
@@ -338,6 +421,7 @@ async def add_comment(post_id: str, data: CommentIn, current=Depends(get_current
         "author": author,
         "text": doc["text"],
         "likes": 0,
+        "parent_comment_id": doc.get("parent_comment_id"),
         "created_at": doc["created_at"],
         "timeAgo": "now",
     }

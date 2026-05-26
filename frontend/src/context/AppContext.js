@@ -275,21 +275,31 @@ export function AppProvider({ children }) {
     setPosts((all) => all.map((p) => p.id === postId ? { ...p, reposts: (p.reposts || 0) + 1 } : p));
   };
 
-  const toggleLike = async (postId) => {
-    // optimistic
+  const toggleLike = async (postId, reactionType = 'like') => {
+    // optimistic update
     setPosts((all) => all.map((p) => p.id === postId
       ? { ...p, liked: !p.liked, likes: p.likes + (p.liked ? -1 : 1) }
       : p));
     try {
-      const res = await postsApi.like(postId);
-      setPosts((all) => all.map((p) => p.id === postId
-        ? { ...p, liked: res.liked, likes: res.likes_count }
-        : p));
+      // Use new react endpoint if reaction type is specified
+      if (reactionType && reactionType !== 'like') {
+        const res = await postsApi.react(postId, reactionType);
+        setPosts((all) => all.map((p) => p.id === postId
+          ? { ...p, liked: res.reaction !== null, likes: res.count }
+          : p));
+      } else {
+        // Fall back to like endpoint for default like
+        const res = await postsApi.like(postId);
+        setPosts((all) => all.map((p) => p.id === postId
+          ? { ...p, liked: res.liked, likes: res.likes_count }
+          : p));
+      }
     } catch (e) {
-      // revert
+      // revert on error
       setPosts((all) => all.map((p) => p.id === postId
         ? { ...p, liked: !p.liked, likes: p.likes + (p.liked ? -1 : 1) }
         : p));
+      console.error('[toggleLike] Error:', e);
     }
   };
 
@@ -298,8 +308,8 @@ export function AppProvider({ children }) {
     setCommentsByPost((all) => ({ ...all, [postId]: list }));
   };
 
-  const addComment = async (postId, text) => {
-    const c = await postsApi.addComment(postId, text);
+  const addComment = async (postId, text, parentCommentId = null) => {
+    const c = await postsApi.addComment(postId, text, parentCommentId);
     setCommentsByPost((all) => ({ ...all, [postId]: [...(all[postId] || []), c] }));
     setPosts((all) => all.map((p) => p.id === postId ? { ...p, comments: p.comments + 1 } : p));
   };

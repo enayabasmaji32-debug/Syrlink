@@ -120,6 +120,11 @@ class PostIn(BaseModel):
 
 class CommentIn(BaseModel):
     text: str
+    parent_comment_id: Optional[str] = None  # For threaded comments
+
+
+class ReactionIn(BaseModel):
+    reaction_type: Literal["like", "celebrate", "support", "insightful"] = "like"
 
 
 class RepostIn(BaseModel):
