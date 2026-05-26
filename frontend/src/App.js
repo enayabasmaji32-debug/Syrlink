@@ -88,17 +88,23 @@ function Protected({ children }) {
   );
 }
 
+function PublicPage({ children }) {
+  const { authReady } = useApp();
+  if (!authReady) return <Loading />;
+  return <>{children}</>;
+}
+
 function Shell() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/privacy" element={<PrivacyPolicy />} />
-      <Route path="/terms" element={<TermsOfUse />} />
-      <Route path="/nda" element={<NDA />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/login" element={<PublicPage><Login /></PublicPage>} />
+      <Route path="/register" element={<PublicPage><Register /></PublicPage>} />
+      <Route path="/verify-email" element={<PublicPage><VerifyEmail /></PublicPage>} />
+      <Route path="/privacy" element={<PublicPage><PrivacyPolicy /></PublicPage>} />
+      <Route path="/terms" element={<PublicPage><TermsOfUse /></PublicPage>} />
+      <Route path="/nda" element={<PublicPage><NDA /></PublicPage>} />
+      <Route path="/forgot-password" element={<PublicPage><ForgotPassword /></PublicPage>} />
+      <Route path="/reset-password" element={<PublicPage><ResetPassword /></PublicPage>} />
       <Route path="/" element={<Protected><Feed /></Protected>} />
       <Route path="/feed" element={<Navigate to="/" replace />} />
       <Route path="/in/:userId" element={<Protected><Profile /></Protected>} />
