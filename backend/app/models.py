@@ -57,9 +57,10 @@ class UserPublic(BaseModel):
 
 
 class RegisterIn(BaseModel):
-    name: str
+    name: str = Field(min_length=2, max_length=100)
     email: EmailStr
-    password: str = Field(min_length=6)
+    password: str = Field(min_length=6, max_length=100)
+    headline: Optional[str] = Field(default="", max_length=200)
 
 
 # ===============================

@@ -30,65 +30,103 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/register")
 async def register(data: RegisterIn):
     """Register a new user."""
-    email = data.email.lower()
-    if await db.users.find_one({"email": email}):
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    user_id = uid()
-    verify_token = uid()
-    doc = {
-        "id": user_id,
-        "name": data.name,
-        "email": email,
-        "password_hash": hash_password(data.password),
-        "avatar": f"https://api.dicebear.com/7.x/initials/svg?seed={data.name}",
-        "cover": "https://images.unsplash.com/photo-1497215728101-856f4ea42174",
-        "headline": data.headline or "",
-        "location": "",
-        "about": "",
-        "verified": False,
-        "email_verified": False,
-        "verify_token": verify_token,
-        "experience": [],
-        "education": [],
-        "skills": [],
-        "languages": [],
-        "connections": 0,
-        "created_at": now_iso(),
-        "last_seen": now_iso(),
-    }
-    await db.users.insert_one(doc)
-    
-    # Send verification email in background (don't block registration)
-    async def send_email():
+    try:
+        # Validate input
+        if not data.name or not data.name.strip():
+            log.warning("[register] Missing or empty name")
+            raise HTTPException(status_code=422, detail="Name is required and cannot be empty")
+        
+        if not data.password or len(data.password) < 6:
+            log.warning("[register] Password too short")
+            raise HTTPException(status_code=422, detail="Password must be at least 6 characters")
+        
+        email = data.email.lower().strip()
+        
+        # Check if email already exists
+        existing_user = await db.users.find_one({"email": email})
+        if existing_user:
+            log.info(f"[register] Email already registered: {email}")
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        user_id = uid()
+        verify_token = uid()
+        doc = {
+            "id": user_id,
+            "name": data.name.strip(),
+            "email": email,
+            "password_hash": hash_password(data.password),
+            "avatar": f"https://api.dicebear.com/7.x/initials/svg?seed={data.name.strip()}",
+            "cover": "https://images.unsplash.com/photo-1497215728101-856f4ea42174",
+            "headline": (data.headline or "").strip(),
+            "location": "",
+            "about": "",
+            "verified": False,
+            "email_verified": False,
+            "verify_token": verify_token,
+            "experience": [],
+            "education": [],
+            "skills": [],
+            "languages": [],
+            "connections": 0,
+            "created_at": now_iso(),
+            "last_seen": now_iso(),
+        }
+        
+        # Insert user with error handling
         try:
-            link = f"{APP_URL}/verify-email?token={verify_token}&uid={user_id}"
-            resend.Emails.send({
-                "from": RESEND_FROM,
-                "to": email,
-                "subject": "Welcome to SyrLink — verify your email",
-                "html": f'<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;background:#f4f2ee"><div style="background:white;border-radius:8px;padding:32px;text-align:center"><h1 style="color:#0a66c2;margin:0 0 8px">Welcome to SyrLink</h1><p style="color:#555">Hi {data.name}, please confirm your email to activate your account.</p><a href="{link}" style="display:inline-block;margin-top:16px;background:#0a66c2;color:white;text-decoration:none;padding:12px 28px;border-radius:24px;font-weight:600">Verify email</a><p style="font-size:11px;color:#888;margin-top:24px">Connecting Talent. Building Futures.</p></div></div>',
-            })
-        except Exception as e:
-            log.warning(f"Resend send failed: {e}")
+            await db.users.insert_one(doc)
+            log.info(f"[register] ✓ User registered: {email}")
+        except Exception as db_err:
+            # Handle duplicate key error or other DB errors
+            if "duplicate" in str(db_err).lower():
+                log.warning(f"[register] Duplicate key error for {email}: {db_err}")
+                raise HTTPException(status_code=400, detail="Email already registered")
+            else:
+                log.error(f"[register] Database error: {db_err}")
+                raise HTTPException(status_code=500, detail="Failed to create account. Please try again later.")
     
-    # Don't await - send in background
-    import asyncio
-    asyncio.create_task(send_email())
+        # Send verification email in background (don't block registration)
+        async def send_email():
+            try:
+                if not APP_URL:
+                    log.warning("[register] APP_URL not configured, skipping email")
+                    return
+                
+                link = f"{APP_URL}/verify-email?token={verify_token}&uid={user_id}"
+                resend.Emails.send({
+                    "from": RESEND_FROM,
+                    "to": email,
+                    "subject": "Welcome to SyrLink — verify your email",
+                    "html": f'<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;background:#f4f2ee"><div style="background:white;border-radius:8px;padding:32px;text-align:center"><h1 style="color:#0a66c2;margin:0 0 8px">Welcome to SyrLink</h1><p style="color:#555">Hi {data.name.strip()}, please confirm your email to activate your account.</p><a href="{link}" style="display:inline-block;margin-top:16px;background:#0a66c2;color:white;text-decoration:none;padding:12px 28px;border-radius:24px;font-weight:600">Verify email</a><p style="font-size:11px;color:#888;margin-top:24px">Connecting Talent. Building Futures.</p></div></div>',
+                })
+                log.debug(f"[register] Verification email sent to {email}")
+            except Exception as e:
+                log.warning(f"[register] Failed to send verification email to {email}: {e}")
+        
+        # Don't await - send in background
+        import asyncio
+        asyncio.create_task(send_email())
+        
+        token = create_token(user_id, email)
+        user_out = {k: v for k, v in doc.items() if k not in ("password_hash", "_id", "verify_token")}
+        response = JSONResponse({"token": token, "user": user_out})
+        response.set_cookie(
+            key=JWT_COOKIE_NAME,
+            value=token,
+            httponly=True,
+            secure=COOKIE_SECURE,
+            samesite="lax",
+            max_age=JWT_COOKIE_MAX_AGE,
+            path="/",
+        )
+        return response
     
-    token = create_token(user_id, email)
-    user_out = {k: v for k, v in doc.items() if k not in ("password_hash", "_id", "verify_token")}
-    response = JSONResponse({"token": token, "user": user_out})
-    response.set_cookie(
-        key=JWT_COOKIE_NAME,
-        value=token,
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite="lax",
-        max_age=JWT_COOKIE_MAX_AGE,
-        path="/",
-    )
-    return response
+    except HTTPException:
+        # Re-raise HTTPException (already has proper status code)
+        raise
+    except Exception as e:
+        log.error(f"[register] Unexpected error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="Registration failed. Please try again later.")
 
 
 @router.post("/login")
