@@ -7,7 +7,7 @@ emailjs.init("EpgnqdYrlAEzFC11t");
  * Send verification email via EmailJS
  * @param {string} to - Recipient email address
  * @param {string} passcode - Verification code/OTP
- * @returns {Promise<void>}
+ * @returns {Promise<{ok: boolean, message: string}>}
  */
 export async function sendVerificationEmail(to, passcode) {
   try {
@@ -15,8 +15,8 @@ export async function sendVerificationEmail(to, passcode) {
       "service_corvet",
       "template_u2f0z7t",
       {
-        email: to,
-        code: passcode,
+        to_email: to,
+        passcode: passcode,
       },
       "EpgnqdYrlAEzFC11t"
     );
@@ -35,7 +35,7 @@ export async function sendVerificationEmail(to, passcode) {
  * Send password reset email via EmailJS
  * @param {string} to - Recipient email address
  * @param {string} resetLink - Password reset link
- * @returns {Promise<void>}
+ * @returns {Promise<{ok: boolean, message: string}>}
  */
 export async function sendPasswordResetEmail(to, resetLink) {
   try {
@@ -43,7 +43,7 @@ export async function sendPasswordResetEmail(to, resetLink) {
       "service_corvet",
       "template_u2f0z7t",
       {
-        email: to,
+        to_email: to,
         reset_link: resetLink,
       },
       "EpgnqdYrlAEzFC11t"
