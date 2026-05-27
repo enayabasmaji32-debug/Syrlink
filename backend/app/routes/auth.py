@@ -1,5 +1,5 @@
 """Authentication routes."""
-from fastapi import APIRouter, HTTPException, Depends, status, Request, Response
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, status, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 import resend
 import time
@@ -33,7 +33,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register")
-async def register(data: RegisterIn, request: Request):
+async def register(data: RegisterIn, request: Request, background_tasks: BackgroundTasks):
     """
     Register a new user and send OTP.
     
@@ -80,35 +80,29 @@ async def register(data: RegisterIn, request: Request):
             
             # الحالة ب: الإيميل موجود لكن البريد لم يتم التحقق منه
             log.info(f"[register] ℹ️ Email exists but not verified, resending OTP: {email}")
-            try:
-                otp_code = ''.join(random.choices(string.digits, k=6))
-                store_otp(email, otp_code)
-                log.info(f"[register] 🔐 Generated new OTP for unverified user: {otp_code}")
-                
-                await send_verification_email(
-                    email, 
-                    otp_code, 
-                    name=existing_user.get("name", "User"), 
-                    link=""
-                )
-                log.info(f"[register] ✓ OTP resent to unverified user: {email}")
-                
-                return JSONResponse(
-                    status_code=200,
-                    content={
-                        "ok": True,
-                        "message": "This email is already registered but not verified. We've resent your verification code.",
-                        "user": {k: v for k, v in existing_user.items() if k not in ("password_hash", "_id")},
-                        "verification_required": True,
-                        "already_registered": True
-                    }
-                )
-            except Exception as e:
-                log.error(f"[register] ❌ Failed to resend OTP: {e}")
-                raise HTTPException(
-                    status_code=500, 
-                    detail="Failed to send verification code. Please try again later."
-                )
+            otp_code = ''.join(random.choices(string.digits, k=6))
+            store_otp(email, otp_code)
+            log.info(f"[register] 🔐 Generated new OTP for unverified user: {otp_code}")
+            
+            background_tasks.add_task(
+                send_verification_email,
+                email,
+                otp_code,
+                existing_user.get("name", "User"),
+                ""
+            )
+            log.info(f"[register] 🔄 Scheduled OTP resend in background for {email}")
+            
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "ok": True,
+                    "message": "This email is already registered but not verified. We've resent your verification code.",
+                    "user": {k: v for k, v in existing_user.items() if k not in ("password_hash", "_id")},
+                    "verification_required": True,
+                    "already_registered": True
+                }
+            )
         
         # ========== الحالة ج: الإيميل جديد تماماً - أنشئ المستخدم ==========
         log.info(f"[register] ✓ Email is new, creating user: {email}")
@@ -158,7 +152,13 @@ async def register(data: RegisterIn, request: Request):
                         try:
                             otp_code = ''.join(random.choices(string.digits, k=6))
                             store_otp(email, otp_code)
-                            await send_verification_email(email, otp_code, name=existing.get("name", ""), link="")
+                            background_tasks.add_task(
+                                send_verification_email,
+                                email,
+                                otp_code,
+                                existing.get("name", ""),
+                                ""
+                            )
                             return JSONResponse(
                                 status_code=200,
                                 content={
@@ -168,7 +168,8 @@ async def register(data: RegisterIn, request: Request):
                                     "already_registered": True
                                 }
                             )
-                        except:
+                        except Exception as email_err:
+                            log.error(f"[register] failed to schedule duplicate resend email: {email_err}")
                             pass
                 raise HTTPException(
                     status_code=400, 
@@ -182,22 +183,18 @@ async def register(data: RegisterIn, request: Request):
                 )
         
         # ========== إرسال OTP ==========
-        try:
-            otp_code = ''.join(random.choices(string.digits, k=6))
-            store_otp(email, otp_code)
-            log.info(f"[register] 🔐 Generated OTP: {otp_code}")
-            
-            await send_verification_email(email, otp_code, name=name, link="")
-            log.info(f"[register] ✓ OTP sent successfully to {email}")
-        except Exception as e:
-            log.error(f"[register] ⚠️ Failed to send OTP: {e}")
-            # لا نفشل التسجيل إذا فشل الإيميل - المستخدم يمكنه طلب إرسال جديد
+        otp_code = ''.join(random.choices(string.digits, k=6))
+        store_otp(email, otp_code)
+        log.info(f"[register] 🔐 Generated OTP: {otp_code}")
+        
+        background_tasks.add_task(send_verification_email, email, otp_code, name, "")
+        log.info(f"[register] 🔄 Scheduled OTP send in background for {email}")
         
         user_out = {k: v for k, v in doc.items() if k not in ("password_hash", "_id")}
         log.info(f"[register] ✅ Registration completed successfully: {email}")
         
         return JSONResponse(
-            status_code=201,
+            status_code=200,
             content={
                 "ok": True,
                 "message": "Registration successful! Please verify your email to complete signup.",
@@ -271,15 +268,26 @@ async def verify_email_otp(data: VerifyOtpIn):
         
         log.info(f"[verify-otp] ✅ Email verified successfully: {email}")
         
-        # ========== خطوة 4: إرجاع بيانات المستخدم المحدثة ==========
+        # ========== خطوة 4: إرجاع بيانات المستخدم المحدثة وإنشاء الجلسة ==========
         user = await db.users.find_one({"email": email})
         user_out = {k: v for k, v in user.items() if k not in ("password_hash", "_id")}
-        
-        return JSONResponse({
+        token = create_token(user["id"], email)
+        response = JSONResponse({
             "ok": True,
-            "message": "Email verified successfully! You can now login.",
+            "message": "Email verified successfully! You are now logged in.",
+            "token": token,
             "user": user_out
         })
+        response.set_cookie(
+            key=JWT_COOKIE_NAME,
+            value=token,
+            httponly=True,
+            secure=COOKIE_SECURE,
+            samesite="lax",
+            max_age=JWT_COOKIE_MAX_AGE,
+            path="/",
+        )
+        return response
     
     except HTTPException:
         raise
@@ -289,16 +297,10 @@ async def verify_email_otp(data: VerifyOtpIn):
             status_code=500, 
             detail="Verification failed. Please try again later."
         )
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        log.error(f"[verify-otp] Unexpected error: {type(e).__name__}: {e}")
-        raise HTTPException(status_code=500, detail="Verification failed. Please try again later.")
 
 
 @router.post("/resend-otp")
-async def resend_otp(data: ResendVerificationIn):
+async def resend_otp(data: ResendVerificationIn, background_tasks: BackgroundTasks):
     """
     Resend OTP to email.
     
@@ -336,18 +338,15 @@ async def resend_otp(data: ResendVerificationIn):
         store_otp(email, otp_code)
         log.info(f"[resend-otp] 🔐 Generated OTP: {otp_code}")
         
-        # إرسال الإيميل
-        try:
-            await send_verification_email(
-                email, 
-                otp_code, 
-                name=user.get("name", "User"), 
-                link=""
-            )
-            log.info(f"[resend-otp] ✓ OTP sent successfully to {email}")
-        except Exception as e:
-            log.error(f"[resend-otp] ⚠️ Failed to send OTP: {e}")
-            # لا نفشل الطلب إذا فشل الإيميل - قد يكون هناك محاولة لاحقة
+        # إرسال الإيميل في الخلفية
+        background_tasks.add_task(
+            send_verification_email,
+            email,
+            otp_code,
+            user.get("name", "User"),
+            ""
+        )
+        log.info(f"[resend-otp] 🔄 Scheduled OTP send in background for {email}")
         
         return JSONResponse({
             "ok": True,
@@ -553,67 +552,15 @@ async def google_callback(code: str | None = None):
 @router.post("/verify-email")
 async def verify_email(data: VerifyEmailIn):
     """Verify email address."""
-    user = await db.users.find_one({"id": data.user_id})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if user.get("email_verified"):
-        return {"ok": True, "already_verified": True}
-    if user.get("verify_token") != data.token:
-        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
-    
-    await db.users.update_one(
-        {"id": data.user_id},
-        {"$set": {"email_verified": True}, "$unset": {"verify_token": ""}},
-    )
-    return {"ok": True}
+    # Deprecated endpoint: token-based verify-email removed in favor of OTP flow.
+    raise HTTPException(status_code=410, detail="Deprecated endpoint. Use /auth/verify-otp instead.")
 
 
 @router.post("/resend-verification")
 async def resend_verification(data: ResendVerificationIn, request: Request):
     """Resend verification email to an unverified account."""
-    email = data.email.lower().strip()
-    user = await db.users.find_one({"email": email})
-    if not user:
-        # Don't reveal whether the email exists
-        return {"ok": True, "already_sent": False}
-    if user.get("email_verified"):
-        return {"ok": True, "already_verified": True}
-
-    new_token = uid()
-    await db.users.update_one({"id": user["id"]}, {"$set": {"verify_token": new_token}})
-
-    app_url = APP_URL or str(request.base_url).rstrip("/")
-    if not app_url:
-        log.error("[resend_verification] APP_URL not configured and request URL unavailable, cannot send verification email")
-        raise HTTPException(status_code=500, detail="Server email configuration is missing")
-
-    link = f"{app_url}/verify-email?token={new_token}&uid={user['id']}"
-    user_name = user.get('name', '')
-    email_payload = {
-        "from": RESEND_FROM,
-        "to": email,
-        "subject": "Verify your SyrLink email",
-        "text": f"Hi {user_name},\n\nPlease verify your SyrLink account by visiting the link below:\n{link}\n\nIf the link does not work, use this code: {new_token}\n\nThank you.",
-        "html": (
-            '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;background:#f4f2ee">'
-            '<div style="background:white;border-radius:8px;padding:32px;text-align:center">'
-            '<h1 style="color:#0a66c2;margin:0 0 8px">Verify your email</h1>'
-            '<p style="color:#555">Hi {name}, please confirm your email to activate your account.</p>'
-            '<p style="color:#333;margin-top:8px">Your verification code is: <strong>{code}</strong></p>'
-            '<a href="{link}" style="display:inline-block;margin-top:16px;background:#0a66c2;color:white;text-decoration:none;padding:12px 28px;border-radius:24px;font-weight:600">Verify email</a>'
-            '<p style="font-size:11px;color:#888;margin-top:24px">Connecting Talent. Building Futures.</p>'
-            '</div></div>'
-        ).format(name=user_name, code=new_token, link=link),
-    }
-
-    try:
-        await send_verification_email(email, new_token, name=user_name, link=link)
-    except Exception as e:
-        log.error(f"[resend_verification] Failed to send verification email to {email}: {e}")
-        # Do not raise; return success semantics to the client
-        return {"ok": True, "resent": False}
-
-    return {"ok": True, "resent": True}
+    # Deprecated endpoint: use /auth/resend-otp for OTP-based flows.
+    raise HTTPException(status_code=410, detail="Deprecated endpoint. Use /auth/resend-otp instead.")
 
 
 @router.post("/forgot-password")

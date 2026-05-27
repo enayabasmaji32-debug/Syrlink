@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../api';
 import { toast } from 'sonner';
+import { useApp } from '../context/AppContext';
 
 /**
  * صفحة التحقق من OTP
@@ -23,6 +24,7 @@ export default function VerifyOtp() {
   const [resending, setResending] = useState(false);
   
   // رسائل و أخطاء
+  const { setUser } = useApp();
   const [message, setMessage] = useState('');      // "Email already verified"
   const [error, setError] = useState('');           // خطأ عام
   const [successMsg, setSuccessMsg] = useState('');  // "Successfully verified"
@@ -79,11 +81,15 @@ export default function VerifyOtp() {
       
       if (result.ok) {
         toast.success('✓ Email verified successfully!');
-        setSuccessMsg('✓ Your email has been verified! Redirecting to login...');
+        setSuccessMsg('✓ Your email has been verified! Redirecting to your dashboard...');
         
-        // توجيه لصفحة تسجيل الدخول بعد 2 ثانية
+        if (result.token) {
+          localStorage.setItem('li_token', result.token);
+          setUser(result.user);
+        }
+
         setTimeout(() => {
-          navigate('/login', { state: { email, verified: true } });
+          navigate('/', { replace: true });
         }, 2000);
       } else {
         setError(result.message || '❌ Verification failed. Check the code and try again.');

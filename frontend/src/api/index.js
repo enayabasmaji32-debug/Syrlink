@@ -3,7 +3,6 @@ import c from './client';
 export const authApi = {
   register: (d) => c.post('/auth/register', d).then((r) => r.data),
   login: (d) => c.post('/auth/login', d).then((r) => r.data),
-  verifyEmail: (d) => c.post('/auth/verify-email', d).then((r) => r.data),
   verifyOtp: (d) => c.post('/auth/verify-otp', d).then((r) => r.data),
   resendVerification: (d) => c.post('/auth/resend-verification', d).then((r) => r.data),
   resendOtp: (d) => c.post('/auth/resend-otp', d).then((r) => r.data),
@@ -14,7 +13,8 @@ export const authApi = {
   googleLoginUrl: () => {
     const rawBackendUrl = process.env.REACT_APP_BACKEND_URL?.trim() || '';
     const normalizedBackendUrl = rawBackendUrl === '/' ? '' : rawBackendUrl.replace(/\/$/, '');
-    return `${normalizedBackendUrl || window.location.origin}/api/auth/google/login`;
+    const origin = typeof globalThis !== 'undefined' && globalThis.location ? globalThis.location.origin : '';
+    return `${normalizedBackendUrl || origin}/api/auth/google/login`;
   },
 };
 
@@ -97,7 +97,7 @@ export const uploadApi = {
   uploadFile: async (file, folder = 'uploads/') => {
     try {
       const sig = await uploadApi.signature(folder, 'image');
-      if (!sig || !sig.signature) {
+      if (!sig?.signature) {
         throw new Error('Failed to get upload signature from server');
       }
       

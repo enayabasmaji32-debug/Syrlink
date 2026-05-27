@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import { authApi, postsApi, companiesApi, usersApi, connectionsApi, jobsApi, messagesApi, notificationsApi } from '../api';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import translations from '../i18n/translations';
@@ -45,7 +46,7 @@ export function AppProvider({ children }) {
   const [appliedJobs, setAppliedJobs] = useState(new Set());
   const [conversations, setConversations] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [language, setLanguageState] = useState(localStorage.getItem('li_language') || 'ar');
+  const [language, setLanguage] = useState(() => localStorage.getItem('li_language') || 'ar');
   const [createContentType, setCreateContentType] = useState(null); // 'post' | 'article' | 'event'
 
   // WebSocket for real-time online status
@@ -95,17 +96,35 @@ export function AppProvider({ children }) {
 
     // Phase 2: باقي البيانات بالتوازي بدون await (ما تبلّك الـ UI)
     Promise.allSettled([
-      companiesApi.myCompanies().then(setOwnedCompanies).catch(() => {}),
-      connectionsApi.network().then((data) => setNetworkUsers(Array.isArray(data) ? data : [])).catch(() => setNetworkUsers([])),
-      usersApi.suggestions().then((data) => setPeople(Array.isArray(data) ? data : [])).catch(() => setPeople([])),
+      companiesApi.myCompanies().then(setOwnedCompanies).catch((err) => {
+        console.warn('Failed loading companies', err);
+        setOwnedCompanies([]);
+      }),
+      connectionsApi.network().then((data) => setNetworkUsers(Array.isArray(data) ? data : [])).catch((err) => {
+        console.warn('Failed loading network users', err);
+        setNetworkUsers([]);
+      }),
+      usersApi.suggestions().then((data) => setPeople(Array.isArray(data) ? data : [])).catch((err) => {
+        console.warn('Failed loading suggestions', err);
+        setPeople([]);
+      }),
       connectionsApi.list().then((data) => {
         setConnections(new Set((data || []).map((c) => c.id)));
-      }).catch(() => {}),
+      }).catch((err) => {
+        console.warn('Failed loading connections list', err);
+      }),
       connectionsApi.pending().then((data) => {
         setInvitations(Array.isArray(data) ? data : []);
-      }).catch(() => setInvitations([])),
-      jobsApi.saved().then((ids) => setSavedJobs(new Set(ids || []))).catch(() => {}),
-      messagesApi.conversations().then(setConversations).catch(() => {}),
+      }).catch((err) => {
+        console.warn('Failed loading pending invitations', err);
+        setInvitations([]);
+      }),
+      jobsApi.saved().then((ids) => setSavedJobs(new Set(ids || []))).catch((err) => {
+        console.warn('Failed loading saved jobs', err);
+      }),
+      messagesApi.conversations().then(setConversations).catch((err) => {
+        console.warn('Failed loading conversations', err);
+      }),
     ]);
   }, []);
 
@@ -169,39 +188,33 @@ export function AppProvider({ children }) {
       return;
     }
 
-    // Load initial notifications
-    notificationsApi.list()
-      .then(setNotifications)
-      .catch((e) => console.error('Failed loading notifications', e));
-    
-    // Only poll if tab is focused (reduce server load)
-    let interval = null;
+    const fetchNotifications = async () => {
+      try {
+        const list = await notificationsApi.list();
+        setNotifications(list);
+      } catch (err) {
+        console.warn('[AppContext] Failed loading notifications', err);
+      }
+    };
+
     const handleVisibilityChange = () => {
       if (!document.hidden && !interval) {
-        // Resume polling
-        interval = setInterval(() => {
-          notificationsApi.list()
-            .then(setNotifications)
-            .catch(() => {});
-        }, 45000); // Poll every 45 seconds (increased from 30s for less load)
+        interval = setInterval(fetchNotifications, 45000);
       } else if (document.hidden && interval) {
-        // Pause polling
         clearInterval(interval);
         interval = null;
       }
     };
 
-    // Start polling only if visible
+    let interval = null;
+    fetchNotifications();
+
     if (!document.hidden) {
-      interval = setInterval(() => {
-        notificationsApi.list()
-          .then(setNotifications)
-          .catch(() => {});
-      }, 45000);
+      interval = setInterval(fetchNotifications, 45000);
     }
-    
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
     return () => {
       if (interval) clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -246,14 +259,14 @@ export function AppProvider({ children }) {
     try {
       const payload = {
         content: content || '',
-        image: image && image.trim() ? image : null,
+        image: image?.trim() ? image : null,
         visibility: 'Anyone',
         company_id: company_id || null,
       };
       console.log('[addPost] Sending:', payload);
       const created = await postsApi.create(payload);
       console.log('[addPost] Response:', created);
-      if (!created || !created.id) {
+      if (!created?.id) {
         throw new Error('Invalid response from server: missing post ID');
       }
       setPosts((p) => [created, ...p]);
@@ -323,9 +336,10 @@ export function AppProvider({ children }) {
   const sendConnect = async (userId) => {
     // Update UI optimistically
     setNetworkUsers((users) => users.map((u) => u.id === userId ? { ...u, relationship: 'pending_sent' } : u));
-    try { 
-      await connectionsApi.request(userId); 
+    try {
+      await connectionsApi.request(userId);
     } catch (e) {
+      console.warn('[sendConnect] request failed', e);
       setNetworkUsers((users) => users.map((u) => u.id === userId ? { ...u, relationship: 'not_connected' } : u));
     }
   };
@@ -380,17 +394,41 @@ export function AppProvider({ children }) {
   const toggleSaveJob = async (jobId) => {
     const wasSaved = savedJobs.has(jobId);
     setSavedJobs((s) => {
-      const n = new Set(s); if (wasSaved) n.delete(jobId); else n.add(jobId); return n;
+      const n = new Set(s);
+      if (wasSaved) {
+        n.delete(jobId);
+      } else {
+        n.add(jobId);
+      }
+      return n;
     });
-    try { await jobsApi.save(jobId); } catch (e) {
-      setSavedJobs((s) => { const n = new Set(s); if (wasSaved) n.add(jobId); else n.delete(jobId); return n; });
+    try {
+      await jobsApi.save(jobId);
+    } catch (e) {
+      console.warn('[toggleSaveJob] failed to save job', e);
+      setSavedJobs((s) => {
+        const n = new Set(s);
+        if (wasSaved) {
+          n.add(jobId);
+        } else {
+          n.delete(jobId);
+        }
+        return n;
+      });
     }
   };
 
   const applyJob = async (jobId) => {
     setAppliedJobs((s) => new Set([...s, jobId]));
-    try { await jobsApi.apply(jobId); } catch (e) {
-      setAppliedJobs((s) => { const n = new Set(s); n.delete(jobId); return n; });
+    try {
+      await jobsApi.apply(jobId);
+    } catch (e) {
+      console.warn('[applyJob] apply failed', e);
+      setAppliedJobs((s) => {
+        const n = new Set(s);
+        n.delete(jobId);
+        return n;
+      });
     }
   };
 
@@ -401,7 +439,7 @@ export function AppProvider({ children }) {
       console.log('[sendMessage] Sending to', convId, ':', payload);
       const msg = await messagesApi.send(convId, payload.text);
       console.log('[sendMessage] Response:', msg);
-      if (!msg || !msg.id) {
+      if (!msg?.id) {
         throw new Error('Invalid response: missing message ID');
       }
       setConversations((convs) => convs.map((c) => c.id === convId
@@ -421,7 +459,11 @@ export function AppProvider({ children }) {
 
   const markNotificationRead = async (id) => {
     setNotifications((all) => all.map((n) => n.id === id ? { ...n, read: true } : n));
-    try { await notificationsApi.read(id); } catch (e) {}
+    try {
+      await notificationsApi.read(id);
+    } catch (e) {
+      console.warn('[markNotificationRead] failed to mark notification read', e);
+    }
   };
 
   const unreadNotifCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
@@ -432,7 +474,7 @@ export function AppProvider({ children }) {
   
   const changeLanguage = useCallback((lang) => {
     if (['ar', 'en'].includes(lang) && lang !== language) {
-      setLanguageState(lang);
+      setLanguage(lang);
       localStorage.setItem('li_language', lang);
       // Batch DOM updates to prevent reflow
       requestAnimationFrame(() => {
@@ -447,7 +489,7 @@ export function AppProvider({ children }) {
     return translationMemo?.[key] || translations.en?.[key] || key;
   }, [translationMemo]);
 
-  const value = {
+  const value = useMemo(() => ({
     user, authReady, login, register, logout, setUser,
     posts, commentsByPost, addPost, toggleLike, addComment, loadComments, repostPost, deletePost, updatePost,
     ownedCompanies, activeCompany, setActiveCompany,
@@ -460,10 +502,18 @@ export function AppProvider({ children }) {
     onlineUsers, isUserOnline,
     language, changeLanguage, t,
     createContentType, setCreateContentType,
-  };
+  }), [
+    user, authReady, posts, commentsByPost, ownedCompanies, activeCompany, people, networkUsers, invitations,
+    connections, pendingSent, savedJobs, appliedJobs, conversations, notifications, language, createContentType,
+    onlineUsers
+  ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
+
+AppProvider.propTypes = {
+  children: PropTypes.node,
+};
 
 export const useApp = () => {
   const ctx = useContext(AppContext);

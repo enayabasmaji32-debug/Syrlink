@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import './App.css';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
@@ -15,7 +16,6 @@ import Messaging from './pages/Messaging';
 import Notifications from './pages/Notifications';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import VerifyEmail from './pages/VerifyEmail';
 import VerifyOtp from './pages/VerifyOtp';
 import AdminPanel from './pages/AdminPanel';
 import MyCompanyRequests from './pages/MyCompanyRequests';
@@ -23,7 +23,7 @@ import PositionRequests from './pages/PositionRequests';
 import EditCompany from './pages/EditCompany';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfUse from './pages/TermsOfUse';
-import NDA from './pages/NDA';
+import Nda from './pages/NDA';
 import { ForgotPassword, ResetPassword } from './pages/PasswordReset';
 import { Toaster } from './components/ui/sonner';
 
@@ -39,7 +39,7 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('Error caught by boundary:', error, errorInfo);
-    const msg = (error && error.message) || '';
+    const msg = error?.message || '';
     // For transient DOM reconciliation errors (often caused by browser
     // extensions like Google Translate), silently remount the tree instead
     // of reloading the page. Reloading triggers token revalidation which
@@ -65,6 +65,10 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+ErrorBoundary.propTypes = {
+  children: PropTypes.node,
+};
+
 function Loading() {
   return (
     <div className="min-h-screen grid place-items-center bg-[#f4f2ee]">
@@ -89,22 +93,29 @@ function Protected({ children }) {
   );
 }
 
+Protected.propTypes = {
+  children: PropTypes.node,
+};
+
 function PublicPage({ children }) {
   const { authReady } = useApp();
   if (!authReady) return <Loading />;
   return <>{children}</>;
 }
 
+PublicPage.propTypes = {
+  children: PropTypes.node,
+};
+
 function Shell() {
   return (
     <Routes>
       <Route path="/login" element={<PublicPage><Login /></PublicPage>} />
       <Route path="/register" element={<PublicPage><Register /></PublicPage>} />
-      <Route path="/verify-email" element={<PublicPage><VerifyEmail /></PublicPage>} />
       <Route path="/verify-otp" element={<PublicPage><VerifyOtp /></PublicPage>} />
       <Route path="/privacy" element={<PublicPage><PrivacyPolicy /></PublicPage>} />
       <Route path="/terms" element={<PublicPage><TermsOfUse /></PublicPage>} />
-      <Route path="/nda" element={<PublicPage><NDA /></PublicPage>} />
+      <Route path="/nda" element={<PublicPage><Nda /></PublicPage>} />
       <Route path="/forgot-password" element={<PublicPage><ForgotPassword /></PublicPage>} />
       <Route path="/reset-password" element={<PublicPage><ResetPassword /></PublicPage>} />
       <Route path="/" element={<Protected><Feed /></Protected>} />

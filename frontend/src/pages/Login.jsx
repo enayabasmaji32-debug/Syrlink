@@ -81,7 +81,7 @@ export default function Login() {
       if (status === 403 && detail?.includes('verify')) {
         toast.error('Please verify your email first');
         setErr('');
-        navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+        navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
         return;
       }
       
@@ -126,7 +126,7 @@ export default function Login() {
               <p className="text-sm text-red-600" data-testid="login-error">{err}</p>
               <p className="text-sm text-gray-600 mt-2">
                 إذا لم يصلك رابط التحقق، يمكنك الانتقال إلى 
-                <Link to={`/verify-email?email=${encodeURIComponent(email)}`} className="text-[#0a66c2] hover:underline">صفحة التحقق</Link>.
+                <Link to={`/verify-otp?email=${encodeURIComponent(email)}`} className="text-[#0a66c2] hover:underline">صفحة التحقق</Link>.
               </p>
             </>
           )}

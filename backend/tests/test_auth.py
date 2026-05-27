@@ -3,6 +3,7 @@ import pytest
 from httpx import AsyncClient
 from app.main import app
 from app.database import db
+from app.otp_store import otp_cache
 
 
 @pytest.mark.asyncio
@@ -77,14 +78,20 @@ async def test_verify_email_allows_login():
 
         saved_user = await db.users.find_one({"id": created["id"]})
         assert saved_user is not None
-        verify_token = saved_user["verify_token"]
 
-        verify_response = await client.post("/api/auth/verify-email", json={
-            "user_id": created["id"],
-            "token": verify_token,
+        # Fetch OTP from in-memory store and verify via OTP endpoint
+        otp_entry = otp_cache.get(created["email"].lower())
+        assert otp_entry is not None, "Expected OTP to be generated and stored"
+        otp_code = otp_entry["code"]
+
+        verify_response = await client.post("/api/auth/verify-otp", json={
+            "email": created["email"],
+            "otp": otp_code,
         })
         assert verify_response.status_code == 200
-        assert verify_response.json()["ok"] is True
+        resp_json = verify_response.json()
+        assert resp_json.get("ok") is True
+        assert "token" in resp_json
 
         login_response = await client.post("/api/auth/login", json={
             "email": "verify@example.com",

@@ -290,8 +290,9 @@ async def register(data: RegisterIn, request: Request):
             await db.users.delete_one({"id": user_id})
             raise HTTPException(status_code=500, detail="Server email configuration is missing")
 
-        link = f"{app_url}/verify-email?token={verify_token}&uid={user_id}"
-        log.info(f"[register] Attempting to send verification email to {email} via SMTP/Brevo")
+        # Legacy token link removed; send user to OTP verification page instead
+        link = f"{app_url}/verify-otp?email={email}"
+        log.info(f"[register] Attempting to send verification email (OTP flow) to {email} via SMTP/Brevo")
         try:
             await send_verification_email(email, verify_token, name=data.name, link=link)
         except Exception as e:
@@ -338,18 +339,8 @@ class ResendVerificationIn(BaseModel):
 
 @api.post("/auth/verify-email")
 async def verify_email(data: VerifyEmailIn):
-    user = await db.users.find_one({"id": data.user_id})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if user.get("email_verified"):
-        return {"ok": True, "already_verified": True}
-    if user.get("verify_token") != data.token:
-        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
-    await db.users.update_one(
-        {"id": data.user_id},
-        {"$set": {"email_verified": True}, "$unset": {"verify_token": ""}},
-    )
-    return {"ok": True}
+    # Deprecated token-based endpoint - replaced by OTP flow (/auth/verify-otp)
+    raise HTTPException(status_code=410, detail="Deprecated endpoint. Use /auth/verify-otp instead.")
 
 
 @api.post("/auth/resend-verification")
@@ -369,7 +360,7 @@ async def resend_verification(data: ResendVerificationIn, request: Request):
         log.error("[resend_verification] APP_URL not configured and request URL unavailable, cannot send verification email")
         raise HTTPException(status_code=500, detail="Server email configuration is missing")
 
-    link = f"{app_url}/verify-email?token={new_token}&uid={user['id']}"
+    link = f"{app_url}/verify-otp?email={email}"
     try:
         user_name = user.get('name', '')
         resend.Emails.send({

@@ -1,6 +1,6 @@
 """Verification and admin routes."""
-from typing import Literal
-from fastapi import APIRouter, HTTPException, Depends, Query
+from typing import Annotated, Literal
+from fastapi import APIRouter, HTTPException, Depends, Query, status
 import time as _t
 
 from app.models import VerificationRequestIn, ReportIn, CompanyRequestDecisionIn, SuspendUserIn, ReportResolveIn
@@ -18,8 +18,15 @@ verification_router = APIRouter(prefix="/verification", tags=["verification"])
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
 
 # يجب أن يكون بعد تعريف admin_router مباشرة
-@admin_router.post("/users/{user_id}/suspend")
-async def admin_suspend_user(user_id: str, data: SuspendUserIn, admin=Depends(require_admin)):
+@admin_router.post(
+    "/users/{user_id}/suspend",
+    responses={404: {"description": "User not found"}},
+)
+async def admin_suspend_user(
+    user_id: str,
+    data: SuspendUserIn,
+    admin: Annotated[dict, Depends(require_admin)],
+):
     """Suspend (ban) a user with a reason."""
     user = await db.users.find_one({"id": user_id})
     if not user:
@@ -35,8 +42,14 @@ async def admin_suspend_user(user_id: str, data: SuspendUserIn, admin=Depends(re
     return {"ok": True, "suspended": True}
 
 
-@verification_router.post("/request")
-async def submit_verification(data: VerificationRequestIn, current=Depends(get_current_user)):
+@verification_router.post(
+    "/request",
+    responses={400: {"description": "You already have a pending verification request"}},
+)
+async def submit_verification(
+    data: VerificationRequestIn,
+    current: Annotated[dict, Depends(get_current_user)],
+):
     """Submit a verification request."""
     existing = await db.verification_requests.find_one({"user_id": current["id"], "status": "pending"})
     if existing:
@@ -59,7 +72,7 @@ async def submit_verification(data: VerificationRequestIn, current=Depends(get_c
 
 
 @verification_router.get("/me")
-async def my_verification(current=Depends(get_current_user)):
+async def my_verification(current: Annotated[dict, Depends(get_current_user)]):
     """Get current user's verification status."""
     req = await db.verification_requests.find_one(
         {"user_id": current["id"]}, {"_id": 0}, sort=[("created_at", -1)]
@@ -68,7 +81,7 @@ async def my_verification(current=Depends(get_current_user)):
 
 
 @admin_router.get("/stats")
-async def admin_stats(admin=Depends(require_admin)):
+async def admin_stats(admin: Annotated[dict, Depends(require_admin)]):
     """Get platform statistics."""
     return {
         "users": await db.users.count_documents({}),
@@ -80,8 +93,14 @@ async def admin_stats(admin=Depends(require_admin)):
     }
 
 
-@admin_router.get("/users")
-async def admin_list_users(q: str = "", admin=Depends(require_admin)):
+@admin_router.get(
+    "/users",
+    responses={404: {"description": "User not found"}},
+)
+async def admin_list_users(
+    q: str = "",
+    admin: Annotated[dict, Depends(require_admin)],
+):
     """List users (for admin)."""
     query = {}
     if q:
@@ -90,8 +109,14 @@ async def admin_list_users(q: str = "", admin=Depends(require_admin)):
     return users
 
 
-@admin_router.post("/users/{user_id}/verify")
-async def admin_toggle_verify(user_id: str, admin=Depends(require_admin)):
+@admin_router.post(
+    "/users/{user_id}/verify",
+    responses={404: {"description": "User not found"}},
+)
+async def admin_toggle_verify(
+    user_id: str,
+    admin: Annotated[dict, Depends(require_admin)],
+):
     """Toggle verification status for a user."""
     user = await db.users.find_one({"id": user_id})
     if not user:
@@ -107,8 +132,14 @@ async def admin_toggle_verify(user_id: str, admin=Depends(require_admin)):
     return {"verified": new_val}
 
 
-@admin_router.delete("/users/{user_id}")
-async def admin_delete_user(user_id: str, admin=Depends(require_admin)):
+@admin_router.delete(
+    "/users/{user_id}",
+    responses={400: {"description": "Cannot delete yourself"}, 404: {"description": "User not found"}},
+)
+async def admin_delete_user(
+    user_id: str,
+    admin: Annotated[dict, Depends(require_admin)],
+):
     """Delete a user (for admin)."""
     if user_id == admin["id"]:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
@@ -117,8 +148,14 @@ async def admin_delete_user(user_id: str, admin=Depends(require_admin)):
     return {"ok": True}
 
 
-@admin_router.get("/verification-requests")
-async def admin_list_verifications(status: str = "pending", admin=Depends(require_admin)):
+@admin_router.get(
+    "/verification-requests",
+    responses={404: {"description": "No verification requests found"}},
+)
+async def admin_list_verifications(
+    status: str = "pending",
+    admin: Annotated[dict, Depends(require_admin)],
+):
     """List verification requests."""
     reqs = await db.verification_requests.find({"status": status}, {"_id": 0}).sort("created_at", -1).to_list(200)
     for r in reqs:
@@ -127,8 +164,14 @@ async def admin_list_verifications(status: str = "pending", admin=Depends(requir
     return reqs
 
 
-@admin_router.post("/verification-requests/{req_id}/approve")
-async def admin_approve_verification(req_id: str, admin=Depends(require_admin)):
+@admin_router.post(
+    "/verification-requests/{req_id}/approve",
+    responses={404: {"description": "Request not found"}},
+)
+async def admin_approve_verification(
+    req_id: str,
+    admin: Annotated[dict, Depends(require_admin)],
+):
     """Approve a verification request."""
     req = await db.verification_requests.find_one({"id": req_id})
     if not req:
@@ -146,8 +189,14 @@ async def admin_approve_verification(req_id: str, admin=Depends(require_admin)):
     return {"ok": True}
 
 
-@admin_router.post("/verification-requests/{req_id}/reject")
-async def admin_reject_verification(req_id: str, admin=Depends(require_admin)):
+@admin_router.post(
+    "/verification-requests/{req_id}/reject",
+    responses={404: {"description": "Request not found"}},
+)
+async def admin_reject_verification(
+    req_id: str,
+    admin: Annotated[dict, Depends(require_admin)],
+):
     """Reject a verification request."""
     req = await db.verification_requests.find_one({"id": req_id})
     if not req:
@@ -164,8 +213,14 @@ async def admin_reject_verification(req_id: str, admin=Depends(require_admin)):
     return {"ok": True}
 
 
-@admin_router.get("/company-requests")
-async def admin_list_company_requests(status: str = "pending", admin=Depends(require_admin)):
+@admin_router.get(
+    "/company-requests",
+    responses={404: {"description": "No company requests found"}},
+)
+async def admin_list_company_requests(
+    status: str = "pending",
+    admin: Annotated[dict, Depends(require_admin)],
+):
     """List company creation requests."""
     reqs = await db.company_requests.find({"status": status}, {"_id": 0}).sort("created_at", -1).to_list(200)
     for r in reqs:
@@ -174,13 +229,23 @@ async def admin_list_company_requests(status: str = "pending", admin=Depends(req
     return reqs
 
 
-@admin_router.post("/company-requests/{req_id}/decide")
-async def admin_decide_company(req_id: str, data: CompanyRequestDecisionIn, admin=Depends(require_admin)):
+@admin_router.post(
+    "/company-requests/{req_id}/decide",
+    responses={
+        404: {"description": "Company request not found"},
+        500: {"description": "Server error while processing company decision"},
+    },
+)
+async def admin_decide_company(
+    req_id: str,
+    data: CompanyRequestDecisionIn,
+    admin: Annotated[dict, Depends(require_admin)],
+):
     """Approve or reject a company creation request."""
     try:
         req = await db.company_requests.find_one({"id": req_id})
         if not req:
-            raise HTTPException(status_code=404, detail="Company request not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company request not found")
         
         if data.action == "approve":
             # Create the company
@@ -256,17 +321,29 @@ async def admin_decide_company(req_id: str, data: CompanyRequestDecisionIn, admi
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error: {str(e)}")
 
 
-@admin_router.post("/company-requests/{req_id}/approve")
-async def admin_approve_company(req_id: str, admin=Depends(require_admin)):
+@admin_router.post(
+    "/company-requests/{req_id}/approve",
+    responses={
+        404: {"description": "Company request not found"},
+        500: {"description": "Server error while approving company request"},
+    },
+)
+async def admin_approve_company(req_id: str, admin: Annotated[dict, Depends(require_admin)]):
     """Approve a company creation request (legacy endpoint)."""
     return await admin_decide_company(req_id, CompanyRequestDecisionIn(action="approve"), admin)
 
 
-@admin_router.post("/company-requests/{req_id}/reject")
-async def admin_reject_company(req_id: str, admin=Depends(require_admin)):
+@admin_router.post(
+    "/company-requests/{req_id}/reject",
+    responses={
+        404: {"description": "Company request not found"},
+        500: {"description": "Server error while rejecting company request"},
+    },
+)
+async def admin_reject_company(req_id: str, admin: Annotated[dict, Depends(require_admin)]):
     """Reject a company creation request (legacy endpoint)."""
     return await admin_decide_company(req_id, CompanyRequestDecisionIn(action="reject"), admin)
 
@@ -276,7 +353,7 @@ reports_router = APIRouter(prefix="/reports", tags=["reports"])
 
 
 @reports_router.post("/")
-async def create_report(data: ReportIn, current=Depends(get_current_user)):
+async def create_report(data: ReportIn, current: Annotated[dict, Depends(get_current_user)]):
     """Submit an abuse report."""
     report = {
         "id": uid(),
@@ -295,8 +372,11 @@ async def create_report(data: ReportIn, current=Depends(get_current_user)):
     return {"ok": True, "report_id": report["id"]}
 
 
-@reports_router.get("/")
-async def get_reports(status: str = "pending", admin=Depends(require_admin)):
+@reports_router.get(
+    "/",
+    responses={404: {"description": "Report not found"}},
+)
+async def get_reports(status: str = "pending", admin: Annotated[dict, Depends(require_admin)]):
     """Get reports (admin only)."""
     query = {"status": status} if status else {}
     reports = await db.reports.find(query, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
@@ -323,12 +403,18 @@ async def get_reports(status: str = "pending", admin=Depends(require_admin)):
 
 # دعم تعليق المستخدم ورفض البلاغ مع سبب وإشعارات
 
-@reports_router.post("/{report_id}/resolve")
+@reports_router.post(
+    "/{report_id}/resolve",
+    responses={
+        404: {"description": "Report not found"},
+        500: {"description": "Server error while resolving report"},
+    },
+)
 async def resolve_report(
     report_id: str,
     action: str = "dismiss",
     data: ReportResolveIn = None,
-    admin=Depends(require_admin)
+    admin: Annotated[dict, Depends(require_admin)],
 ):
     """Resolve a report (admin only). action: dismiss, remove_content, remove_user, suspend, reject"""
     reason = data.reason if data else ""
@@ -407,7 +493,7 @@ companies_requests_router = APIRouter(prefix="/company-requests", tags=["compani
 
 
 @companies_requests_router.get("/me")
-async def my_company_requests(current=Depends(get_current_user)):
+async def my_company_requests(current: Annotated[dict, Depends(get_current_user)]):
     """Get current user's company requests and their status."""
     reqs = await db.company_requests.find({"user_id": current["id"]}, {"_id": 0}).sort("created_at", -1).to_list(50)
     return reqs
@@ -430,15 +516,21 @@ async def news():
 
 
 @admin_router.get("/companies")
-async def admin_list_companies(status: str = "approved", admin=Depends(require_admin)):
+async def admin_list_companies(status: str = "approved", admin: Annotated[dict, Depends(require_admin)]):
     """List companies (for admin). Default shows approved companies."""
     query = {"status": status} if status else {}
     companies = await db.companies.find(query, {"_id": 0}).sort("created_at", -1).limit(200).to_list(200)
     return companies
 
 
-@admin_router.delete("/companies/{company_id}")
-async def admin_delete_company(company_id: str, admin=Depends(require_admin)):
+@admin_router.delete(
+    "/companies/{company_id}",
+    responses={
+        404: {"description": "Company not found"},
+        500: {"description": "Server error while deleting company"},
+    },
+)
+async def admin_delete_company(company_id: str, admin: Annotated[dict, Depends(require_admin)]):
     """Delete a company (for admin)."""
     company = await db.companies.find_one({"id": company_id})
     if not company:
@@ -462,8 +554,15 @@ async def admin_delete_company(company_id: str, admin=Depends(require_admin)):
     return {"ok": True}
 
 
-@util_router.get("/cloudinary/signature")
-async def cloudinary_signature(folder: str = Query("uploads/"), resource_type: str = Query("image"), current=Depends(get_current_user)):
+@util_router.get(
+    "/cloudinary/signature",
+    responses={400: {"description": "Invalid folder path or resource type"}},
+)
+async def cloudinary_signature(
+    folder: Annotated[str, Query("uploads/")],
+    resource_type: Annotated[str, Query("image")],
+    current: Annotated[dict, Depends(get_current_user)],
+):
     """Get Cloudinary signed upload credentials."""
     allowed_prefixes = ("users/", "posts/", "uploads/", "verification/", "companies/")
     
