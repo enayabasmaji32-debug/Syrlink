@@ -29,7 +29,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register")
-async def register(data: RegisterIn):
+async def register(data: RegisterIn, request: Request):
     """Register a new user."""
     try:
         # Validate input
@@ -86,12 +86,13 @@ async def register(data: RegisterIn):
                 log.error(f"[register] Database error: {db_err}")
                 raise HTTPException(status_code=500, detail="Failed to create account. Please try again later.")
     
-        if not APP_URL:
-            log.error("[register] APP_URL not configured, cannot send verification email")
+        app_url = APP_URL or str(request.base_url).rstrip("/")
+        if not app_url:
+            log.error("[register] APP_URL not configured and request URL unavailable, cannot send verification email")
             await db.users.delete_one({"id": user_id})
             raise HTTPException(status_code=500, detail="Server email configuration is missing")
 
-        link = f"{APP_URL}/verify-email?token={verify_token}&uid={user_id}"
+        link = f"{app_url}/verify-email?token={verify_token}&uid={user_id}"
         email_payload = {
             "from": RESEND_FROM,
             "to": email,
@@ -318,7 +319,7 @@ async def verify_email(data: VerifyEmailIn):
 
 
 @router.post("/resend-verification")
-async def resend_verification(data: ResendVerificationIn):
+async def resend_verification(data: ResendVerificationIn, request: Request):
     """Resend verification email to an unverified account."""
     email = data.email.lower().strip()
     user = await db.users.find_one({"email": email})
@@ -331,11 +332,12 @@ async def resend_verification(data: ResendVerificationIn):
     new_token = uid()
     await db.users.update_one({"id": user["id"]}, {"$set": {"verify_token": new_token}})
 
-    if not APP_URL:
-        log.error("[resend_verification] APP_URL not configured, cannot send verification email")
+    app_url = APP_URL or str(request.base_url).rstrip("/")
+    if not app_url:
+        log.error("[resend_verification] APP_URL not configured and request URL unavailable, cannot send verification email")
         raise HTTPException(status_code=500, detail="Server email configuration is missing")
 
-    link = f"{APP_URL}/verify-email?token={new_token}&uid={user['id']}"
+    link = f"{app_url}/verify-email?token={new_token}&uid={user['id']}"
     user_name = user.get('name', '')
     email_payload = {
         "from": RESEND_FROM,
@@ -364,7 +366,7 @@ async def resend_verification(data: ResendVerificationIn):
 
 
 @router.post("/forgot-password")
-async def forgot_password(data: ForgotPasswordIn):
+async def forgot_password(data: ForgotPasswordIn, request: Request):
     """Request password reset."""
     email = data.email.lower()
     user = await db.users.find_one({"email": email})
@@ -379,7 +381,8 @@ async def forgot_password(data: ForgotPasswordIn):
         # Send reset email in background (don't block)
         async def send_email():
             try:
-                link = f"{APP_URL}/reset-password?token={reset_token}&uid={user['id']}"
+                app_url = APP_URL or str(request.base_url).rstrip("/")
+                link = f"{app_url}/reset-password?token={reset_token}&uid={user['id']}"
                 resend.Emails.send({
                     "from": RESEND_FROM,
                     "to": email,
