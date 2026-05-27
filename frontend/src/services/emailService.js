@@ -15,7 +15,7 @@ export async function sendVerificationEmail(to, passcode) {
       "service_corvet",
       "template_u2f0z7t",
       {
-        to_email: to,
+        email: to,
         passcode: passcode,
       },
       "EpgnqdYrlAEzFC11t"
@@ -43,7 +43,7 @@ export async function sendPasswordResetEmail(to, resetLink) {
       "service_corvet",
       "template_u2f0z7t",
       {
-        to_email: to,
+        email: to,
         reset_link: resetLink,
       },
       "EpgnqdYrlAEzFC11t"
