@@ -25,20 +25,44 @@ export default function VerifyOtp() {
     setError('');
     setSuccessMsg('');
     
+    if (!email || !email.trim()) {
+      setError('البريد الإلكتروني غير محدد. يرجى العودة للتسجيل.');
+      return;
+    }
+    
     if (!otp || otp.length !== 6) {
       setError('يجب أن يكون الرمز 6 أرقام.');
       return;
     }
 
+    console.log('[VerifyOtp] Verifying OTP for:', email);
     setVerifying(true);
     try {
-      await authApi.verifyOtp({ email, otp });
-      setSuccessMsg('✓ تم التحقق من بريدك الإلكتروني بنجاح! جاري تسجيل الدخول...');
+      const result = await authApi.verifyOtp({ email, otp });
+      console.log('[VerifyOtp] Verification successful:', result);
+      
+      setSuccessMsg('✓ تم التحقق من بريدك الإلكتروني بنجاح! جاري نقلك...');
+      
+      // Navigate to login or home after successful verification
       setTimeout(() => {
-        navigate('/login', { state: { email, autoVerified: true } });
+        navigate('/login', { state: { email, verified: true } });
       }, 1500);
     } catch (e) {
-      setError(e.response?.data?.detail || 'فشل التحقق. تأكد من الرمز وحاول مرة أخرى.');
+      console.error('[VerifyOtp] Error:', e);
+      
+      let errorMsg = 'فشل التحقق. تأكد من الرمز وحاول مرة أخرى.';
+      
+      if (e?.response?.status === 401) {
+        errorMsg = 'الرمز غير صحيح أو منتهي الصلاحية.';
+      } else if (e?.response?.status === 404) {
+        errorMsg = 'لم نجد بريدك الإلكتروني. يرجى إعادة التسجيل.';
+      } else if (e?.response?.status === 500) {
+        errorMsg = 'خطأ في السيرفر. يرجى المحاولة لاحقاً.';
+      } else if (!e?.response) {
+        errorMsg = 'خطأ في الاتصال. تأكد من الإنترنت.';
+      }
+      
+      setError(e.response?.data?.detail || errorMsg);
     } finally {
       setVerifying(false);
     }
