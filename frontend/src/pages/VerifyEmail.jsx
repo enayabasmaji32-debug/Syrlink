@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { authApi } from '../api';
+import { sendVerificationEmail } from '../services/emailService';
 
 export default function VerifyEmail() {
   const [params] = useSearchParams();
@@ -27,20 +28,28 @@ export default function VerifyEmail() {
   const resend = async (event) => {
     event.preventDefault();
     setState({ loading: true, ok: null, msg: '' });
+    if (!email) {
+      setState({
+        loading: false,
+        ok: false,
+        msg: 'يرجى إدخال بريدك الإلكتروني.',
+      });
+      return;
+    }
     try {
-      const result = await authApi.resendVerification({ email });
+      // Generate a random 6-digit code for verification
+      const passcode = Math.floor(100000 + Math.random() * 900000).toString();
+      await sendVerificationEmail(email, passcode);
       setState({
         loading: false,
         ok: true,
-        msg: result.already_verified
-          ? 'هذا البريد مفعل بالفعل.'
-          : 'تم إرسال رمز التحقق مرة أخرى إلى بريدك الإلكتروني.',
+        msg: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني. تحقق من صندوق الرسائل.',
       });
     } catch (e) {
       setState({
         loading: false,
         ok: false,
-        msg: e.response?.data?.detail || 'فشل إرسال رمز التحقق. حاول لاحقاً.',
+        msg: e.message || 'فشل إرسال رمز التحقق. حاول لاحقاً.',
       });
     }
   };
