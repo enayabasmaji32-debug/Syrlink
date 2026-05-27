@@ -42,3 +42,10 @@ GOOGLE_OAUTH_REDIRECT = os.getenv("GOOGLEREDIRECTURI", "")
 # Admin defaults
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@syrlink.com").lower()
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Admin@SyrLink2026")
+
+# Brevo / SMTP (optional SMTP using Brevo)
+BREVO_HOST = os.environ.get("BREVO_HOST", "")
+BREVO_PORT = int(os.environ.get("BREVO_PORT", "587")) if os.environ.get("BREVO_PORT") else None
+BREVO_USER = os.environ.get("BREVO_USER", "")
+BREVO_PASS = os.environ.get("BREVO_PASS", "")
+BREVO_FROM = os.environ.get("BREVO_FROM", RESEND_FROM)

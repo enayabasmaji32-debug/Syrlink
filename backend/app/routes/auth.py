@@ -12,6 +12,7 @@ from app.models import (
 )
 from app.security import hash_password, verify_password, create_token, get_current_user
 from app.utils import uid, now_iso
+from app.email_smtp import send_verification_email
 from app.database import db
 from app.config import (
     APP_URL,
@@ -93,21 +94,13 @@ async def register(data: RegisterIn, request: Request):
             raise HTTPException(status_code=500, detail="Server email configuration is missing")
 
         link = f"{app_url}/verify-email?token={verify_token}&uid={user_id}"
-        email_payload = {
-            "from": RESEND_FROM,
-            "to": email,
-            "subject": "Welcome to SyrLink — verify your email",
-            "html": f'<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;background:#f4f2ee"><div style="background:white;border-radius:8px;padding:32px;text-align:center"><h1 style="color:#0a66c2;margin:0 0 8px">Welcome to SyrLink</h1><p style="color:#555">Hi {data.name.strip()}, please confirm your email to activate your account.</p><p style="color:#333;margin-top:8px">Your verification code is: <strong>{verify_token}</strong></p><a href="{link}" style="display:inline-block;margin-top:16px;background:#0a66c2;color:white;text-decoration:none;padding:12px 28px;border-radius:24px;font-weight:600">Verify email</a><p style="font-size:11px;color:#888;margin-top:24px">Connecting Talent. Building Futures.</p></div></div>',
-        }
-
-        log.info(f"[register] Sending verification email to {email}")
+        log.info(f"[register] Attempting to send verification email to {email} via SMTP/Brevo")
         try:
-            await asyncio.to_thread(resend.Emails.send, email_payload)
-            log.debug(f"[register] Verification email sent to {email}")
+            await send_verification_email(email, verify_token, name=data.name.strip(), link=link)
+            log.debug(f"[register] Verification email sent to {email} via SMTP/Brevo")
         except Exception as e:
-            log.error(f"[register] Failed to send verification email to {email}: {e}", exc_info=True)
-            await db.users.delete_one({"id": user_id})
-            raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again later.")
+            # On failure: log but do not delete the user or raise 500 — allow registration to complete
+            log.error(f"[register] Failed to send verification email to {email}: {e}")
 
         user_out = {k: v for k, v in doc.items() if k not in ("password_hash", "_id", "verify_token")}
         return JSONResponse({"ok": True, "message": "Verification email sent", "user": user_out, "verification_required": True})
@@ -357,10 +350,11 @@ async def resend_verification(data: ResendVerificationIn, request: Request):
     }
 
     try:
-        await asyncio.to_thread(resend.Emails.send, email_payload)
+        await send_verification_email(email, new_token, name=user_name, link=link)
     except Exception as e:
-        log.error(f"[resend_verification] Failed to send verification email to {email}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again later.")
+        log.error(f"[resend_verification] Failed to send verification email to {email}: {e}")
+        # Do not raise; return success semantics to the client
+        return {"ok": True, "resent": False}
 
     return {"ok": True, "resent": True}
 

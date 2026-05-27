@@ -61,6 +61,7 @@ cloudinary.config(
 resend.api_key = os.environ.get("RESEND_API_KEY", "")
 RESEND_FROM = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
 APP_URL = os.environ.get("APP_URL", "")
+from app.email_smtp import send_verification_email
 
 app = FastAPI(title="SyrLink API")
 api = APIRouter(prefix="/api")
@@ -290,14 +291,12 @@ async def register(data: RegisterIn, request: Request):
             raise HTTPException(status_code=500, detail="Server email configuration is missing")
 
         link = f"{app_url}/verify-email?token={verify_token}&uid={user_id}"
-        email_payload = {
-            "from": RESEND_FROM,
-            "to": email,
-            "subject": "Welcome to SyrLink — verify your email",
-            "html": f'<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;background:#f4f2ee"><div style="background:white;border-radius:8px;padding:32px;text-align:center"><h1 style="color:#0a66c2;margin:0 0 8px">Welcome to SyrLink</h1><p style="color:#555">Hi {data.name}, please confirm your email to activate your account.</p><p style="color:#333;margin-top:8px">Your verification code is: <strong>{verify_token}</strong></p><a href="{link}" style="display:inline-block;margin-top:16px;background:#0a66c2;color:white;text-decoration:none;padding:12px 28px;border-radius:24px;font-weight:600">Verify email</a><p style="font-size:11px;color:#888;margin-top:24px">Connecting Talent. Building Futures.</p></div></div>',
-        }
-        log.info(f"[register] Sending verification email to {email}")
-        await asyncio.to_thread(resend.Emails.send, email_payload)
+        log.info(f"[register] Attempting to send verification email to {email} via SMTP/Brevo")
+        try:
+            await send_verification_email(email, verify_token, name=data.name, link=link)
+        except Exception as e:
+            # Log failure but allow registration to succeed
+            log.error(f"[register] Failed to send verification email to {email}: {e}")
     except HTTPException:
         raise
     except Exception as e:
