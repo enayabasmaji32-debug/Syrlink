@@ -27,10 +27,9 @@ export default function Register() {
     setErr('');
     setLoading(true);
     try {
-      const result = await register({ name, email, password, headline });
+      await register({ name, email, password, headline });
       toast.success('تم إنشاء الحساب! يرجى تأكيد بريدك الإلكتروني.');
-      const nextUid = result?.user?.id || '';
-      navigate(nextUid ? `/verify-email?uid=${encodeURIComponent(nextUid)}` : '/verify-email');
+      navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
     } catch (e) {
       setErr(fmtErr(e.response?.data?.detail) || e.message);
     } finally {

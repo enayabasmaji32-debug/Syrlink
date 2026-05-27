@@ -4,7 +4,9 @@ export const authApi = {
   register: (d) => c.post('/auth/register', d).then((r) => r.data),
   login: (d) => c.post('/auth/login', d).then((r) => r.data),
   verifyEmail: (d) => c.post('/auth/verify-email', d).then((r) => r.data),
+  verifyOtp: (d) => c.post('/auth/verify-otp', d).then((r) => r.data),
   resendVerification: (d) => c.post('/auth/resend-verification', d).then((r) => r.data),
+  resendOtp: (d) => c.post('/auth/resend-otp', d).then((r) => r.data),
   me: () => c.get('/auth/me').then((r) => r.data),
   logout: () => c.post('/auth/logout').then((r) => r.data),
   // Fallback to the current origin at runtime when the env var is empty or just '/'

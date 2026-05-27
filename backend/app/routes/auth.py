@@ -5,14 +5,17 @@ import resend
 import time
 import httpx
 import asyncio
+import random
+import string
 from urllib.parse import urlencode
 
 from app.models import (
-    RegisterIn, LoginIn, VerifyEmailIn, ResendVerificationIn, ForgotPasswordIn, ResetPasswordIn
+    RegisterIn, LoginIn, VerifyEmailIn, VerifyOtpIn, ResendVerificationIn, ForgotPasswordIn, ResetPasswordIn
 )
 from app.security import hash_password, verify_password, create_token, get_current_user
 from app.utils import uid, now_iso
 from app.email_smtp import send_verification_email
+from app.otp_store import store_otp, verify_otp, clear_otp
 from app.database import db
 from app.config import (
     APP_URL,
@@ -31,7 +34,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register")
 async def register(data: RegisterIn, request: Request):
-    """Register a new user."""
+    """Register a new user and send OTP."""
     try:
         # Validate input
         if not data.name or not data.name.strip():
@@ -51,7 +54,6 @@ async def register(data: RegisterIn, request: Request):
             raise HTTPException(status_code=400, detail="Email already registered")
         
         user_id = uid()
-        verify_token = uid()
         doc = {
             "id": user_id,
             "name": data.name.strip(),
@@ -64,7 +66,6 @@ async def register(data: RegisterIn, request: Request):
             "about": "",
             "verified": False,
             "email_verified": False,
-            "verify_token": verify_token,
             "experience": [],
             "education": [],
             "skills": [],
@@ -74,43 +75,130 @@ async def register(data: RegisterIn, request: Request):
             "last_seen": now_iso(),
         }
         
-        # Insert user with error handling
+        # Insert user
         try:
             await db.users.insert_one(doc)
             log.info(f"[register] ✓ User registered: {email}")
         except Exception as db_err:
-            # Handle duplicate key error or other DB errors
             if "duplicate" in str(db_err).lower():
                 log.warning(f"[register] Duplicate key error for {email}: {db_err}")
                 raise HTTPException(status_code=400, detail="Email already registered")
             else:
                 log.error(f"[register] Database error: {db_err}")
                 raise HTTPException(status_code=500, detail="Failed to create account. Please try again later.")
-    
-        app_url = APP_URL or str(request.base_url).rstrip("/")
-        if not app_url:
-            log.error("[register] APP_URL not configured and request URL unavailable, cannot send verification email")
-            await db.users.delete_one({"id": user_id})
-            raise HTTPException(status_code=500, detail="Server email configuration is missing")
-
-        link = f"{app_url}/verify-email?token={verify_token}&uid={user_id}"
-        log.info(f"[register] Attempting to send verification email to {email} via SMTP/Brevo")
+        
+        # Generate 6-digit OTP
+        otp_code = ''.join(random.choices(string.digits, k=6))
+        store_otp(email, otp_code)
+        log.info(f"[register] Generated OTP for {email}: {otp_code}")
+        
+        # Send OTP via email
         try:
-            await send_verification_email(email, verify_token, name=data.name.strip(), link=link)
-            log.debug(f"[register] Verification email sent to {email} via SMTP/Brevo")
+            await send_verification_email(email, otp_code, name=data.name.strip(), link="")
+            log.info(f"[register] OTP sent to {email}")
         except Exception as e:
-            # On failure: log but do not delete the user or raise 500 — allow registration to complete
-            log.error(f"[register] Failed to send verification email to {email}: {e}")
-
-        user_out = {k: v for k, v in doc.items() if k not in ("password_hash", "_id", "verify_token")}
-        return JSONResponse({"ok": True, "message": "Verification email sent", "user": user_out, "verification_required": True})
+            log.error(f"[register] Failed to send OTP to {email}: {e}")
+            # Don't fail registration if email send fails
+        
+        user_out = {k: v for k, v in doc.items() if k not in ("password_hash", "_id")}
+        return JSONResponse({
+            "ok": True,
+            "message": "OTP sent to your email",
+            "user": user_out,
+            "verification_required": True
+        })
     
     except HTTPException:
-        # Re-raise HTTPException (already has proper status code)
         raise
     except Exception as e:
         log.error(f"[register] Unexpected error: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail="Registration failed. Please try again later.")
+
+
+@router.post("/verify-otp")
+async def verify_email_otp(data: VerifyOtpIn):
+    """Verify OTP and mark email as verified."""
+    try:
+        email = data.email.lower().strip()
+        otp_code = data.otp.strip()
+        
+        # Verify OTP
+        if not verify_otp(email, otp_code):
+            log.warning(f"[verify-otp] Invalid OTP for {email}")
+            raise HTTPException(status_code=401, detail="Invalid or expired OTP")
+        
+        # Update user: mark email as verified
+        result = await db.users.update_one(
+            {"email": email},
+            {"$set": {"email_verified": True, "verified": True}}
+        )
+        
+        if result.matched_count == 0:
+            log.error(f"[verify-otp] User not found for email {email}")
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        log.info(f"[verify-otp] ✓ Email verified for {email}")
+        
+        # Get updated user
+        user = await db.users.find_one({"email": email})
+        user_out = {k: v for k, v in user.items() if k not in ("password_hash", "_id")}
+        
+        return JSONResponse({
+            "ok": True,
+            "message": "Email verified successfully",
+            "user": user_out
+        })
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"[verify-otp] Unexpected error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="Verification failed. Please try again later.")
+
+
+@router.post("/resend-otp")
+async def resend_otp(data: ResendVerificationIn):
+    """Resend OTP to email."""
+    try:
+        email = data.email.lower().strip()
+        
+        # Check if user exists
+        user = await db.users.find_one({"email": email})
+        if not user:
+            log.warning(f"[resend-otp] User not found: {email}")
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        if user.get("email_verified"):
+            log.info(f"[resend-otp] Email already verified: {email}")
+            return JSONResponse({
+                "ok": True,
+                "message": "Email already verified",
+                "already_verified": True
+            })
+        
+        # Generate new OTP
+        otp_code = ''.join(random.choices(string.digits, k=6))
+        store_otp(email, otp_code)
+        log.info(f"[resend-otp] Generated OTP for {email}: {otp_code}")
+        
+        # Send OTP
+        try:
+            await send_verification_email(email, otp_code, name=user.get("name", ""), link="")
+            log.info(f"[resend-otp] OTP sent to {email}")
+        except Exception as e:
+            log.error(f"[resend-otp] Failed to send OTP: {e}")
+        
+        return JSONResponse({
+            "ok": True,
+            "message": "OTP sent to your email",
+            "already_verified": False
+        })
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"[resend-otp] Unexpected error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to resend OTP. Please try again later.")
 
 
 @router.post("/login")

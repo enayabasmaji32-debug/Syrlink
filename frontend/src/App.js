@@ -15,10 +15,11 @@ import Messaging from './pages/Messaging';
 import Notifications from './pages/Notifications';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyEmail from './pages/VerifyEmail';
+import VerifyOtp from './pages/VerifyOtp';
 import AdminPanel from './pages/AdminPanel';
 import MyCompanyRequests from './pages/MyCompanyRequests';
 import PositionRequests from './pages/PositionRequests';
-import VerifyEmail from './pages/VerifyEmail';
 import EditCompany from './pages/EditCompany';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfUse from './pages/TermsOfUse';
@@ -100,6 +101,7 @@ function Shell() {
       <Route path="/login" element={<PublicPage><Login /></PublicPage>} />
       <Route path="/register" element={<PublicPage><Register /></PublicPage>} />
       <Route path="/verify-email" element={<PublicPage><VerifyEmail /></PublicPage>} />
+      <Route path="/verify-otp" element={<PublicPage><VerifyOtp /></PublicPage>} />
       <Route path="/privacy" element={<PublicPage><PrivacyPolicy /></PublicPage>} />
       <Route path="/terms" element={<PublicPage><TermsOfUse /></PublicPage>} />
       <Route path="/nda" element={<PublicPage><NDA /></PublicPage>} />

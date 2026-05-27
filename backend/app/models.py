@@ -97,6 +97,11 @@ class VerifyEmailIn(BaseModel):
     token: str
 
 
+class VerifyOtpIn(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=6, max_length=6)
+
+
 class ResendVerificationIn(BaseModel):
     email: EmailStr
 
