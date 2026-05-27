@@ -34,29 +34,84 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register")
 async def register(data: RegisterIn, request: Request):
-    """Register a new user and send OTP."""
+    """
+    Register a new user and send OTP.
+    
+    الخطوات:
+    1. التحقق من صحة البيانات المدخلة
+    2. التحقق من وجود الإيميل في قاعدة البيانات
+       - إذا موجود وتم التحقق منه → خطأ (استخدم login)
+       - إذا موجود ولم يتم التحقق → أرسل OTP جديد
+       - إذا جديد → أنشئ المستخدم وأرسل OTP
+    3. إرسال OTP عبر الإيميل
+    4. إرجاع رسالة نجاح مع بيانات المستخدم
+    """
     try:
-        # Validate input
+        # ========== خطوة 1: التحقق من صحة البيانات ==========
         if not data.name or not data.name.strip():
-            log.warning("[register] Missing or empty name")
+            log.warning("[register] ❌ Missing or empty name")
             raise HTTPException(status_code=422, detail="Name is required and cannot be empty")
         
         if not data.password or len(data.password) < 6:
-            log.warning("[register] Password too short")
+            log.warning("[register] ❌ Password too short")
             raise HTTPException(status_code=422, detail="Password must be at least 6 characters")
         
         if not data.email or not data.email.strip():
-            log.warning("[register] Missing or empty email")
+            log.warning("[register] ❌ Missing or empty email")
             raise HTTPException(status_code=422, detail="Email is required")
         
         email = data.email.lower().strip()
         name = data.name.strip()
+        log.info(f"[register] 📨 Starting registration for: {email}")
         
-        # Check if email already exists
+        # ========== خطوة 2: التحقق من وجود الإيميل ==========
         existing_user = await db.users.find_one({"email": email})
+        
         if existing_user:
-            log.info(f"[register] Email already registered: {email}")
-            raise HTTPException(status_code=400, detail="Email already registered")
+            log.info(f"[register] ℹ️ Email already exists in database: {email}")
+            
+            # الحالة أ: الإيميل موجود والبريد مفعّل بالفعل
+            if existing_user.get("email_verified"):
+                log.warning(f"[register] ❌ Email already verified: {email}")
+                raise HTTPException(
+                    status_code=400, 
+                    detail="This email is already registered and verified. Please login instead."
+                )
+            
+            # الحالة ب: الإيميل موجود لكن البريد لم يتم التحقق منه
+            log.info(f"[register] ℹ️ Email exists but not verified, resending OTP: {email}")
+            try:
+                otp_code = ''.join(random.choices(string.digits, k=6))
+                store_otp(email, otp_code)
+                log.info(f"[register] 🔐 Generated new OTP for unverified user: {otp_code}")
+                
+                await send_verification_email(
+                    email, 
+                    otp_code, 
+                    name=existing_user.get("name", "User"), 
+                    link=""
+                )
+                log.info(f"[register] ✓ OTP resent to unverified user: {email}")
+                
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "ok": True,
+                        "message": "This email is already registered but not verified. We've resent your verification code.",
+                        "user": {k: v for k, v in existing_user.items() if k not in ("password_hash", "_id")},
+                        "verification_required": True,
+                        "already_registered": True
+                    }
+                )
+            except Exception as e:
+                log.error(f"[register] ❌ Failed to resend OTP: {e}")
+                raise HTTPException(
+                    status_code=500, 
+                    detail="Failed to send verification code. Please try again later."
+                )
+        
+        # ========== الحالة ج: الإيميل جديد تماماً - أنشئ المستخدم ==========
+        log.info(f"[register] ✓ Email is new, creating user: {email}")
         
         user_id = uid()
         doc = {
@@ -70,7 +125,7 @@ async def register(data: RegisterIn, request: Request):
             "location": "",
             "about": "",
             "verified": False,
-            "email_verified": False,
+            "email_verified": False,  # يجب التحقق من البريد
             "experience": [],
             "education": [],
             "skills": [],
@@ -80,42 +135,72 @@ async def register(data: RegisterIn, request: Request):
             "last_seen": now_iso(),
         }
         
-        # Insert user
+        # محاولة إدراج المستخدم
         try:
             await db.users.insert_one(doc)
-            log.info(f"[register] ✓ User registered: {email}")
+            log.info(f"[register] ✓ User created in database: {email}")
         except Exception as db_err:
             error_msg = str(db_err).lower()
-            if "duplicate" in error_msg:
-                log.warning(f"[register] Duplicate key error for {email}: {db_err}")
-                # Check which field caused the duplicate
-                if "email" in error_msg:
-                    raise HTTPException(status_code=400, detail="Email already registered")
-                else:
-                    raise HTTPException(status_code=400, detail="This email is already in use")
+            
+            # إذا حدث خطأ duplicate أثناء الإدراج
+            if "duplicate" in error_msg or "e11000" in error_msg:
+                log.warning(f"[register] ⚠️ Duplicate key error (race condition): {email}")
+                # جرّب مرة أخرى: قد يكون هناك سباق مع طلب آخر
+                existing = await db.users.find_one({"email": email})
+                if existing:
+                    if existing.get("email_verified"):
+                        raise HTTPException(
+                            status_code=400, 
+                            detail="Email already registered. Please login instead."
+                        )
+                    else:
+                        # أرسل OTP للمستخدم الموجود
+                        try:
+                            otp_code = ''.join(random.choices(string.digits, k=6))
+                            store_otp(email, otp_code)
+                            await send_verification_email(email, otp_code, name=existing.get("name", ""), link="")
+                            return JSONResponse(
+                                status_code=200,
+                                content={
+                                    "ok": True,
+                                    "message": "Email already registered. OTP has been resent.",
+                                    "verification_required": True,
+                                    "already_registered": True
+                                }
+                            )
+                        except:
+                            pass
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Email already registered. Please try to verify or login."
+                )
             else:
-                log.error(f"[register] Database error: {db_err}")
-                raise HTTPException(status_code=500, detail="Failed to create account. Please try again later.")
+                log.error(f"[register] ❌ Database error: {db_err}")
+                raise HTTPException(
+                    status_code=500, 
+                    detail="Failed to create account. Please try again later."
+                )
         
-        # Generate 6-digit OTP
-        otp_code = ''.join(random.choices(string.digits, k=6))
-        store_otp(email, otp_code)
-        log.info(f"[register] Generated OTP for {email}: {otp_code}")
-        
-        # Send OTP via email (non-blocking)
+        # ========== إرسال OTP ==========
         try:
+            otp_code = ''.join(random.choices(string.digits, k=6))
+            store_otp(email, otp_code)
+            log.info(f"[register] 🔐 Generated OTP: {otp_code}")
+            
             await send_verification_email(email, otp_code, name=name, link="")
-            log.info(f"[register] OTP sent to {email}")
+            log.info(f"[register] ✓ OTP sent successfully to {email}")
         except Exception as e:
-            log.error(f"[register] Failed to send OTP to {email}: {e}")
-            # Don't fail registration if email send fails - user can resend
+            log.error(f"[register] ⚠️ Failed to send OTP: {e}")
+            # لا نفشل التسجيل إذا فشل الإيميل - المستخدم يمكنه طلب إرسال جديد
         
         user_out = {k: v for k, v in doc.items() if k not in ("password_hash", "_id")}
+        log.info(f"[register] ✅ Registration completed successfully: {email}")
+        
         return JSONResponse(
             status_code=201,
             content={
                 "ok": True,
-                "message": "Registration successful. OTP sent to your email.",
+                "message": "Registration successful! Please verify your email to complete signup.",
                 "user": user_out,
                 "verification_required": True
             }
@@ -124,43 +209,86 @@ async def register(data: RegisterIn, request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        log.error(f"[register] Unexpected error: {type(e).__name__}: {e}")
-        raise HTTPException(status_code=500, detail="Registration failed. Please try again later.")
+        log.error(f"[register] ❌ Unexpected error: {type(e).__name__}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Registration failed. Please try again later."
+        )
 
 
 @router.post("/verify-otp")
 async def verify_email_otp(data: VerifyOtpIn):
-    """Verify OTP and mark email as verified."""
+    """
+    Verify OTP and mark email as verified.
+    
+    الخطوات:
+    1. التحقق من صحة الرمز المدخل
+    2. البحث عن المستخدم بالإيميل
+    3. تحديث حالة البريد (email_verified = True)
+    4. إرجاع بيانات المستخدم
+    """
     try:
         email = data.email.lower().strip()
         otp_code = data.otp.strip()
         
-        # Verify OTP
-        if not verify_otp(email, otp_code):
-            log.warning(f"[verify-otp] Invalid OTP for {email}")
-            raise HTTPException(status_code=401, detail="Invalid or expired OTP")
+        log.info(f"[verify-otp] 🔐 Verifying OTP for: {email}")
         
-        # Update user: mark email as verified
+        # ========== خطوة 1: التحقق من الرمز ==========
+        if not verify_otp(email, otp_code):
+            log.warning(f"[verify-otp] ❌ Invalid or expired OTP for {email}")
+            raise HTTPException(
+                status_code=401, 
+                detail="Invalid or expired OTP. Please request a new one."
+            )
+        
+        log.info(f"[verify-otp] ✓ OTP is valid for {email}")
+        
+        # ========== خطوة 2: البحث عن المستخدم ==========
+        user = await db.users.find_one({"email": email})
+        if not user:
+            log.error(f"[verify-otp] ❌ User not found for email {email}")
+            raise HTTPException(
+                status_code=404, 
+                detail="User not found. Please register first."
+            )
+        
+        # ========== خطوة 3: تحديث حالة البريد ==========
         result = await db.users.update_one(
             {"email": email},
-            {"$set": {"email_verified": True, "verified": True}}
+            {"$set": {
+                "email_verified": True,
+                "verified": True,
+                "last_seen": now_iso()
+            }}
         )
         
         if result.matched_count == 0:
-            log.error(f"[verify-otp] User not found for email {email}")
-            raise HTTPException(status_code=404, detail="User not found")
+            log.error(f"[verify-otp] ❌ Failed to update user: {email}")
+            raise HTTPException(
+                status_code=404, 
+                detail="User not found"
+            )
         
-        log.info(f"[verify-otp] ✓ Email verified for {email}")
+        log.info(f"[verify-otp] ✅ Email verified successfully: {email}")
         
-        # Get updated user
+        # ========== خطوة 4: إرجاع بيانات المستخدم المحدثة ==========
         user = await db.users.find_one({"email": email})
         user_out = {k: v for k, v in user.items() if k not in ("password_hash", "_id")}
         
         return JSONResponse({
             "ok": True,
-            "message": "Email verified successfully",
+            "message": "Email verified successfully! You can now login.",
             "user": user_out
         })
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"[verify-otp] ❌ Unexpected error: {type(e).__name__}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Verification failed. Please try again later."
+        )
     
     except HTTPException:
         raise
@@ -171,47 +299,70 @@ async def verify_email_otp(data: VerifyOtpIn):
 
 @router.post("/resend-otp")
 async def resend_otp(data: ResendVerificationIn):
-    """Resend OTP to email."""
+    """
+    Resend OTP to email.
+    
+    الحالات:
+    1. إذا المستخدم موجود والبريد لم يتم التحقق منه → أرسل OTP جديد
+    2. إذا المستخدم موجود والبريد تم التحقق منه → أخبره أنه مفعّل بالفعل
+    3. إذا المستخدم غير موجود → خطأ 404
+    """
     try:
         email = data.email.lower().strip()
         
-        # Check if user exists
+        log.info(f"[resend-otp] 📨 Resending OTP for: {email}")
+        
+        # ========== البحث عن المستخدم ==========
         user = await db.users.find_one({"email": email})
         if not user:
-            log.warning(f"[resend-otp] User not found: {email}")
-            raise HTTPException(status_code=404, detail="User not found")
+            log.warning(f"[resend-otp] ❌ User not found: {email}")
+            raise HTTPException(
+                status_code=404, 
+                detail="User not found. Please register first."
+            )
         
+        # ========== الحالة 1: البريد مفعّل بالفعل ==========
         if user.get("email_verified"):
-            log.info(f"[resend-otp] Email already verified: {email}")
+            log.info(f"[resend-otp] ℹ️ Email already verified: {email}")
             return JSONResponse({
                 "ok": True,
-                "message": "Email already verified",
+                "message": "Your email is already verified! You can login now.",
                 "already_verified": True
             })
         
-        # Generate new OTP
+        # ========== الحالة 2: البريد غير مفعّل، أرسل OTP جديد ==========
+        log.info(f"[resend-otp] 🔐 Generating new OTP for unverified user: {email}")
         otp_code = ''.join(random.choices(string.digits, k=6))
         store_otp(email, otp_code)
-        log.info(f"[resend-otp] Generated OTP for {email}: {otp_code}")
+        log.info(f"[resend-otp] 🔐 Generated OTP: {otp_code}")
         
-        # Send OTP
+        # إرسال الإيميل
         try:
-            await send_verification_email(email, otp_code, name=user.get("name", ""), link="")
-            log.info(f"[resend-otp] OTP sent to {email}")
+            await send_verification_email(
+                email, 
+                otp_code, 
+                name=user.get("name", "User"), 
+                link=""
+            )
+            log.info(f"[resend-otp] ✓ OTP sent successfully to {email}")
         except Exception as e:
-            log.error(f"[resend-otp] Failed to send OTP: {e}")
+            log.error(f"[resend-otp] ⚠️ Failed to send OTP: {e}")
+            # لا نفشل الطلب إذا فشل الإيميل - قد يكون هناك محاولة لاحقة
         
         return JSONResponse({
             "ok": True,
-            "message": "OTP sent to your email",
+            "message": "New verification code sent to your email!",
             "already_verified": False
         })
     
     except HTTPException:
         raise
     except Exception as e:
-        log.error(f"[resend-otp] Unexpected error: {type(e).__name__}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to resend OTP. Please try again later.")
+        log.error(f"[resend-otp] ❌ Unexpected error: {type(e).__name__}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Failed to resend OTP. Please try again later."
+        )
 
 
 @router.post("/login")
@@ -244,9 +395,14 @@ async def login(data: LoginIn):
         log.warning(f"Login failed: invalid password - {email} (DB: {db_time:.3f}s, PWD: {pwd_time:.3f}s)")
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    # Check email verification status BEFORE allowing login
     if not user.get("email_verified"):
         log.warning(f"Login blocked: email not verified - {email}")
-        raise HTTPException(status_code=403, detail="يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول.")
+        # Provide helpful message with link to verify
+        raise HTTPException(
+            status_code=403,
+            detail="Please verify your email to complete login. Check your inbox for a verification code."
+        )
 
     # Update last_seen on login
     update_start = time.time()

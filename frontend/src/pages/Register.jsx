@@ -26,7 +26,7 @@ export default function Register() {
     e.preventDefault();
     setErr('');
     
-    // Client-side validation
+    // ========== التحقق من البيانات ==========
     if (!name.trim()) {
       setErr('Name is required');
       return;
@@ -41,28 +41,68 @@ export default function Register() {
     }
     
     setLoading(true);
+    console.log('[Register] 📨 Attempting to register:', { name, email });
+    
     try {
+      // استدعاء API
       const result = await register({ name, email, password, headline });
-      console.log('[Register] Success:', result);
-      toast.success('تم إنشاء الحساب! يرجى تأكيد بريدك الإلكتروني.');
-      navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
-    } catch (e) {
-      console.error('[Register] Error:', e);
+      console.log('[Register] ✅ Registration successful:', result);
       
-      // Extract error message
+      toast.success('✓ Account created! Please verify your email.');
+      
+      // توجيه لصفحة التحقق من OTP
+      navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
+      
+    } catch (e) {
+      console.error('[Register] ❌ Error:', e);
+      
+      // ========== معالجة الأخطاء ==========
       let errorMsg = 'Failed to create account. Please try again.';
       
+      // الخطأ 400: بريد مسجل أو مشاكل أخرى
       if (e?.response?.status === 400) {
-        errorMsg = e.response?.data?.detail || 'Email already registered';
-      } else if (e?.response?.status === 422) {
-        errorMsg = e.response?.data?.detail || 'Invalid input';
-      } else if (e?.response?.status === 500) {
+        const detail = e.response?.data?.detail || '';
+        
+        // الحالة 1: بريد موجود ومفعّل
+        if (detail.includes('already registered and verified') || detail.includes('Please login')) {
+          errorMsg = 'This email is already registered. Please login instead.';
+        }
+        // الحالة 2: بريد موجود لكن لم يتم التحقق منه
+        else if (detail.includes('not verified') || detail.includes('resent')) {
+          errorMsg = 'This email is registered but not verified. We\'ve resent your verification code.';
+          toast.success('✓ Check your email for the verification code.');
+          // توجيه لصفحة التحقق مع نفس الإيميل
+          setTimeout(() => {
+            navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
+          }, 1500);
+          return;
+        }
+        // الحالة 3: أخطاء أخرى
+        else {
+          errorMsg = detail || 'Email already registered';
+        }
+      } 
+      // الخطأ 422: مشاكل في التحقق من صحة البيانات
+      else if (e?.response?.status === 422) {
+        errorMsg = e.response?.data?.detail || 'Invalid input. Please check your information.';
+      } 
+      // الخطأ 500: خطأ في السيرفر
+      else if (e?.response?.status === 500) {
         errorMsg = 'Server error. Please try again later.';
-      } else if (e?.code === 'ECONNABORTED') {
-        errorMsg = 'Request timeout. Please check your connection.';
-      } else if (!e?.response) {
-        errorMsg = 'Network error. Please check your connection.';
-      } else {
+      } 
+      // مشاكل الاتصال
+      else if (e?.code === 'ECONNABORTED') {
+        errorMsg = 'Registration took too long. Your account may have been created. Please try to verify your email.';
+        // توجيه لصفحة التحقق بعد تأخير
+        setTimeout(() => navigate(`/verify-otp?email=${encodeURIComponent(email)}`), 2000);
+      } 
+      else if (!e?.response && (e?.message === 'Network Error' || e?.code === 'ERR_NETWORK')) {
+        errorMsg = 'Network error. Your account may have been created despite this error. Please try to verify your email.';
+        // توجيه لصفحة التحقق
+        setTimeout(() => navigate(`/verify-otp?email=${encodeURIComponent(email)}`), 2000);
+      } 
+      // خطأ عام
+      else {
         errorMsg = e.message || errorMsg;
       }
       
@@ -89,6 +129,7 @@ export default function Register() {
               required value={name} onChange={(e) => setName(e.target.value)}
               className="w-full mt-1 border border-gray-400 rounded px-3 py-2 text-sm focus:outline-none focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/30"
               data-testid="register-name-input"
+              disabled={loading}
             />
           </div>
           <div>
@@ -99,6 +140,7 @@ export default function Register() {
               autoComplete="email"
               className="w-full mt-1 border border-gray-400 rounded px-3 py-2 text-sm focus:outline-none focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/30"
               data-testid="register-email-input"
+              disabled={loading}
             />
           </div>
           <div>
@@ -109,6 +151,7 @@ export default function Register() {
               autoComplete="new-password"
               className="w-full mt-1 border border-gray-400 rounded px-3 py-2 text-sm focus:outline-none focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/30"
               data-testid="register-password-input"
+              disabled={loading}
             />
           </div>
           <div>
@@ -119,6 +162,7 @@ export default function Register() {
               placeholder="e.g. Software Engineer at SyrTech"
               className="w-full mt-1 border border-gray-400 rounded px-3 py-2 text-sm focus:outline-none focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/30"
               data-testid="register-headline-input"
+              disabled={loading}
             />
           </div>
           {err && <p className="text-sm text-red-600" data-testid="register-error">{err}</p>}
@@ -131,7 +175,7 @@ export default function Register() {
           </button>
           <p className="text-sm text-gray-600 mt-3">
             إذا لم يصلك رابط التحقق بعد التسجيل، يمكنك الانتقال إلى{' '}
-            <Link to={`/verify-email?email=${encodeURIComponent(email)}`} className="text-[#0a66c2] hover:underline">
+            <Link to={`/verify-otp?email=${encodeURIComponent(email)}`} className="text-[#0a66c2] hover:underline">
               صفحة التحقق
             </Link>
             .

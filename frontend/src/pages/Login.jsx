@@ -75,10 +75,17 @@ export default function Login() {
       navigate('/');
     } catch (e) {
       const detail = e.response?.data?.detail;
-      setErr(fmtErr(detail) || e.message);
-      if (detail?.includes('تأكيد بريدك الإلكتروني')) {
+      const status = e.response?.status;
+      
+      // Handle email verification required (403)
+      if (status === 403 && detail?.includes('verify')) {
+        toast.error('Please verify your email first');
+        setErr('');
         navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+        return;
       }
+      
+      setErr(fmtErr(detail) || e.message);
     } finally {
       setLoading(false);
     }
