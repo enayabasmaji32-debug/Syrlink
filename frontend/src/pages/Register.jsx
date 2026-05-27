@@ -25,13 +25,48 @@ export default function Register() {
   const submit = async (e) => {
     e.preventDefault();
     setErr('');
+    
+    // Client-side validation
+    if (!name.trim()) {
+      setErr('Name is required');
+      return;
+    }
+    if (!email.trim()) {
+      setErr('Email is required');
+      return;
+    }
+    if (password.length < 6) {
+      setErr('Password must be at least 6 characters');
+      return;
+    }
+    
     setLoading(true);
     try {
-      await register({ name, email, password, headline });
+      const result = await register({ name, email, password, headline });
+      console.log('[Register] Success:', result);
       toast.success('تم إنشاء الحساب! يرجى تأكيد بريدك الإلكتروني.');
       navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
     } catch (e) {
-      setErr(fmtErr(e.response?.data?.detail) || e.message);
+      console.error('[Register] Error:', e);
+      
+      // Extract error message
+      let errorMsg = 'Failed to create account. Please try again.';
+      
+      if (e?.response?.status === 400) {
+        errorMsg = e.response?.data?.detail || 'Email already registered';
+      } else if (e?.response?.status === 422) {
+        errorMsg = e.response?.data?.detail || 'Invalid input';
+      } else if (e?.response?.status === 500) {
+        errorMsg = 'Server error. Please try again later.';
+      } else if (e?.code === 'ECONNABORTED') {
+        errorMsg = 'Request timeout. Please check your connection.';
+      } else if (!e?.response) {
+        errorMsg = 'Network error. Please check your connection.';
+      } else {
+        errorMsg = e.message || errorMsg;
+      }
+      
+      setErr(errorMsg);
     } finally {
       setLoading(false);
     }

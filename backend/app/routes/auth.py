@@ -45,7 +45,12 @@ async def register(data: RegisterIn, request: Request):
             log.warning("[register] Password too short")
             raise HTTPException(status_code=422, detail="Password must be at least 6 characters")
         
+        if not data.email or not data.email.strip():
+            log.warning("[register] Missing or empty email")
+            raise HTTPException(status_code=422, detail="Email is required")
+        
         email = data.email.lower().strip()
+        name = data.name.strip()
         
         # Check if email already exists
         existing_user = await db.users.find_one({"email": email})
@@ -56,10 +61,10 @@ async def register(data: RegisterIn, request: Request):
         user_id = uid()
         doc = {
             "id": user_id,
-            "name": data.name.strip(),
+            "name": name,
             "email": email,
             "password_hash": hash_password(data.password),
-            "avatar": f"https://api.dicebear.com/7.x/initials/svg?seed={data.name.strip()}",
+            "avatar": f"https://api.dicebear.com/7.x/initials/svg?seed={name}",
             "cover": "https://images.unsplash.com/photo-1497215728101-856f4ea42174",
             "headline": (data.headline or "").strip(),
             "location": "",
@@ -80,9 +85,14 @@ async def register(data: RegisterIn, request: Request):
             await db.users.insert_one(doc)
             log.info(f"[register] ✓ User registered: {email}")
         except Exception as db_err:
-            if "duplicate" in str(db_err).lower():
+            error_msg = str(db_err).lower()
+            if "duplicate" in error_msg:
                 log.warning(f"[register] Duplicate key error for {email}: {db_err}")
-                raise HTTPException(status_code=400, detail="Email already registered")
+                # Check which field caused the duplicate
+                if "email" in error_msg:
+                    raise HTTPException(status_code=400, detail="Email already registered")
+                else:
+                    raise HTTPException(status_code=400, detail="This email is already in use")
             else:
                 log.error(f"[register] Database error: {db_err}")
                 raise HTTPException(status_code=500, detail="Failed to create account. Please try again later.")
@@ -92,21 +102,24 @@ async def register(data: RegisterIn, request: Request):
         store_otp(email, otp_code)
         log.info(f"[register] Generated OTP for {email}: {otp_code}")
         
-        # Send OTP via email
+        # Send OTP via email (non-blocking)
         try:
-            await send_verification_email(email, otp_code, name=data.name.strip(), link="")
+            await send_verification_email(email, otp_code, name=name, link="")
             log.info(f"[register] OTP sent to {email}")
         except Exception as e:
             log.error(f"[register] Failed to send OTP to {email}: {e}")
-            # Don't fail registration if email send fails
+            # Don't fail registration if email send fails - user can resend
         
         user_out = {k: v for k, v in doc.items() if k not in ("password_hash", "_id")}
-        return JSONResponse({
-            "ok": True,
-            "message": "OTP sent to your email",
-            "user": user_out,
-            "verification_required": True
-        })
+        return JSONResponse(
+            status_code=201,
+            content={
+                "ok": True,
+                "message": "Registration successful. OTP sent to your email.",
+                "user": user_out,
+                "verification_required": True
+            }
+        )
     
     except HTTPException:
         raise

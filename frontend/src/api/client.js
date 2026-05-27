@@ -41,17 +41,21 @@ client.interceptors.response.use(
     // Log network errors for debugging
     if (!err.response) {
       if (err.code === 'ECONNABORTED') {
-        console.error('Request timeout - server took too long to respond');
+        console.error('[API] Request timeout - server took too long to respond');
+      } else if (err.message === 'Network Error') {
+        console.error('[API] Network error:', err);
       } else {
-        console.error('Network error:', err.message);
+        console.error('[API] Network error:', err.message, err.code);
       }
+    } else {
+      console.error('[API] HTTP error:', err.response.status, err.response.data);
     }
     
     // If 502/503 (gateway/service unavailable), retry
     if ((err?.response?.status === 502 || err?.response?.status === 503) && 
         (!err.config.retryCount || err.config.retryCount < MAX_RETRIES)) {
       err.config.retryCount = (err.config.retryCount || 0) + 1;
-      console.warn(`Server unavailable (${err.response.status}), retrying (attempt ${err.config.retryCount}/${MAX_RETRIES})`);
+      console.warn(`[API] Server unavailable (${err.response.status}), retrying (attempt ${err.config.retryCount}/${MAX_RETRIES})`);
       
       // Wait before retrying (exponential backoff)
       await new Promise(resolve => setTimeout(resolve, 1000 * err.config.retryCount));
@@ -69,7 +73,7 @@ client.interceptors.response.use(
     // Retry logic for timeout errors
     if (err.code === 'ECONNABORTED' && (!err.config.retryCount || err.config.retryCount < MAX_RETRIES)) {
       err.config.retryCount = (err.config.retryCount || 0) + 1;
-      console.warn(`Retrying request (attempt ${err.config.retryCount}/${MAX_RETRIES})`);
+      console.warn(`[API] Retrying timeout request (attempt ${err.config.retryCount}/${MAX_RETRIES})`);
       
       // Wait before retrying
       await new Promise(resolve => setTimeout(resolve, 1000 * err.config.retryCount));
