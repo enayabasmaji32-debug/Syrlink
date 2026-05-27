@@ -97,6 +97,10 @@ class VerifyEmailIn(BaseModel):
     token: str
 
 
+class ResendVerificationIn(BaseModel):
+    email: EmailStr
+
+
 class ForgotPasswordIn(BaseModel):
     email: EmailStr
 

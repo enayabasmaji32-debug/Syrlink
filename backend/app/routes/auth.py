@@ -4,10 +4,11 @@ from fastapi.responses import JSONResponse, RedirectResponse
 import resend
 import time
 import httpx
+import asyncio
 from urllib.parse import urlencode
 
 from app.models import (
-    RegisterIn, LoginIn, VerifyEmailIn, ForgotPasswordIn, ResetPasswordIn
+    RegisterIn, LoginIn, VerifyEmailIn, ResendVerificationIn, ForgotPasswordIn, ResetPasswordIn
 )
 from app.security import hash_password, verify_password, create_token, get_current_user
 from app.utils import uid, now_iso
@@ -85,41 +86,30 @@ async def register(data: RegisterIn):
                 log.error(f"[register] Database error: {db_err}")
                 raise HTTPException(status_code=500, detail="Failed to create account. Please try again later.")
     
-        # Send verification email in background (don't block registration)
-        async def send_email():
-            try:
-                if not APP_URL:
-                    log.warning("[register] APP_URL not configured, skipping email")
-                    return
-                
-                link = f"{APP_URL}/verify-email?token={verify_token}&uid={user_id}"
-                resend.Emails.send({
-                    "from": RESEND_FROM,
-                    "to": email,
-                    "subject": "Welcome to SyrLink — verify your email",
-                    "html": f'<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;background:#f4f2ee"><div style="background:white;border-radius:8px;padding:32px;text-align:center"><h1 style="color:#0a66c2;margin:0 0 8px">Welcome to SyrLink</h1><p style="color:#555">Hi {data.name.strip()}, please confirm your email to activate your account.</p><a href="{link}" style="display:inline-block;margin-top:16px;background:#0a66c2;color:white;text-decoration:none;padding:12px 28px;border-radius:24px;font-weight:600">Verify email</a><p style="font-size:11px;color:#888;margin-top:24px">Connecting Talent. Building Futures.</p></div></div>',
-                })
-                log.debug(f"[register] Verification email sent to {email}")
-            except Exception as e:
-                log.warning(f"[register] Failed to send verification email to {email}: {e}")
-        
-        # Don't await - send in background
-        import asyncio
-        asyncio.create_task(send_email())
-        
-        token = create_token(user_id, email)
+        if not APP_URL:
+            log.error("[register] APP_URL not configured, cannot send verification email")
+            await db.users.delete_one({"id": user_id})
+            raise HTTPException(status_code=500, detail="Server email configuration is missing")
+
+        link = f"{APP_URL}/verify-email?token={verify_token}&uid={user_id}"
+        email_payload = {
+            "from": RESEND_FROM,
+            "to": email,
+            "subject": "Welcome to SyrLink — verify your email",
+            "html": f'<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;background:#f4f2ee"><div style="background:white;border-radius:8px;padding:32px;text-align:center"><h1 style="color:#0a66c2;margin:0 0 8px">Welcome to SyrLink</h1><p style="color:#555">Hi {data.name.strip()}, please confirm your email to activate your account.</p><p style="color:#333;margin-top:8px">Your verification code is: <strong>{verify_token}</strong></p><a href="{link}" style="display:inline-block;margin-top:16px;background:#0a66c2;color:white;text-decoration:none;padding:12px 28px;border-radius:24px;font-weight:600">Verify email</a><p style="font-size:11px;color:#888;margin-top:24px">Connecting Talent. Building Futures.</p></div></div>',
+        }
+
+        log.info(f"[register] Sending verification email to {email}")
+        try:
+            await asyncio.to_thread(resend.Emails.send, email_payload)
+            log.debug(f"[register] Verification email sent to {email}")
+        except Exception as e:
+            log.error(f"[register] Failed to send verification email to {email}: {e}", exc_info=True)
+            await db.users.delete_one({"id": user_id})
+            raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again later.")
+
         user_out = {k: v for k, v in doc.items() if k not in ("password_hash", "_id", "verify_token")}
-        response = JSONResponse({"token": token, "user": user_out})
-        response.set_cookie(
-            key=JWT_COOKIE_NAME,
-            value=token,
-            httponly=True,
-            secure=COOKIE_SECURE,
-            samesite="lax",
-            max_age=JWT_COOKIE_MAX_AGE,
-            path="/",
-        )
-        return response
+        return JSONResponse({"ok": True, "message": "Verification email sent", "user": user_out, "verification_required": True})
     
     except HTTPException:
         # Re-raise HTTPException (already has proper status code)
@@ -158,6 +148,10 @@ async def login(data: LoginIn):
     if not password_valid:
         log.warning(f"Login failed: invalid password - {email} (DB: {db_time:.3f}s, PWD: {pwd_time:.3f}s)")
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    if not user.get("email_verified"):
+        log.warning(f"Login blocked: email not verified - {email}")
+        raise HTTPException(status_code=403, detail="يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول.")
 
     # Update last_seen on login
     update_start = time.time()
@@ -324,31 +318,49 @@ async def verify_email(data: VerifyEmailIn):
 
 
 @router.post("/resend-verification")
-async def resend_verification(current=Depends(get_current_user)):
-    """Resend verification email."""
-    if current.get("email_verified"):
+async def resend_verification(data: ResendVerificationIn):
+    """Resend verification email to an unverified account."""
+    email = data.email.lower().strip()
+    user = await db.users.find_one({"email": email})
+    if not user:
+        # Don't reveal whether the email exists
+        return {"ok": True, "already_sent": False}
+    if user.get("email_verified"):
         return {"ok": True, "already_verified": True}
-    
+
     new_token = uid()
-    await db.users.update_one({"id": current["id"]}, {"$set": {"verify_token": new_token}})
-    
-    # Send verification email in background (don't block)
-    async def send_email():
-        try:
-            link = f"{APP_URL}/verify-email?token={new_token}&uid={current['id']}"
-            resend.Emails.send({
-                "from": RESEND_FROM,
-                "to": current["email"],
-                "subject": "Verify your SyrLink email",
-                "html": f'<p>Hi {current["name"]},</p><p>Confirm your email: <a href="{link}">Verify now</a></p>',
-            })
-        except Exception as e:
-            log.warning(f"Resend verification failed: {e}")
-    
-    # Don't await - send in background
-    import asyncio
-    asyncio.create_task(send_email())
-    return {"ok": True}
+    await db.users.update_one({"id": user["id"]}, {"$set": {"verify_token": new_token}})
+
+    if not APP_URL:
+        log.error("[resend_verification] APP_URL not configured, cannot send verification email")
+        raise HTTPException(status_code=500, detail="Server email configuration is missing")
+
+    link = f"{APP_URL}/verify-email?token={new_token}&uid={user['id']}"
+    user_name = user.get('name', '')
+    email_payload = {
+        "from": RESEND_FROM,
+        "to": email,
+        "subject": "Verify your SyrLink email",
+        "text": f"Hi {user_name},\n\nPlease verify your SyrLink account by visiting the link below:\n{link}\n\nIf the link does not work, use this code: {new_token}\n\nThank you.",
+        "html": (
+            '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;background:#f4f2ee">'
+            '<div style="background:white;border-radius:8px;padding:32px;text-align:center">'
+            '<h1 style="color:#0a66c2;margin:0 0 8px">Verify your email</h1>'
+            '<p style="color:#555">Hi {name}, please confirm your email to activate your account.</p>'
+            '<p style="color:#333;margin-top:8px">Your verification code is: <strong>{code}</strong></p>'
+            '<a href="{link}" style="display:inline-block;margin-top:16px;background:#0a66c2;color:white;text-decoration:none;padding:12px 28px;border-radius:24px;font-weight:600">Verify email</a>'
+            '<p style="font-size:11px;color:#888;margin-top:24px">Connecting Talent. Building Futures.</p>'
+            '</div></div>'
+        ).format(name=user_name, code=new_token, link=link),
+    }
+
+    try:
+        await asyncio.to_thread(resend.Emails.send, email_payload)
+    except Exception as e:
+        log.error(f"[resend_verification] Failed to send verification email to {email}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again later.")
+
+    return {"ok": True, "resent": True}
 
 
 @router.post("/forgot-password")

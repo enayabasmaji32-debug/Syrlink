@@ -220,14 +220,9 @@ export function AppProvider({ children }) {
   };
 
   const register = async (data) => {
-    const { token, user: u } = await authApi.register(data);
-    localStorage.setItem('li_token', token);
+    const result = await authApi.register(data);
     setCookie('li_cookie_consent', 'yes', { maxAge: 31536000 });
-    setToken(token);
-    setUser(u);
-    // Defer non-critical data loading to avoid blocking UI
-    Promise.allSettled([refreshAll(u), loadOwnedCompanies(u)]);
-    return u;
+    return result;
   };
 
   const logout = async () => {

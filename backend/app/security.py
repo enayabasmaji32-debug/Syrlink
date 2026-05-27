@@ -106,6 +106,8 @@ async def get_current_user(
     )
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if not user.get("email_verified"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified")
     return user
 
 

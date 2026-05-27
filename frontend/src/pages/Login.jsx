@@ -74,7 +74,11 @@ export default function Login() {
       toast.success('Welcome back!');
       navigate('/');
     } catch (e) {
-      setErr(fmtErr(e.response?.data?.detail) || e.message);
+      const detail = e.response?.data?.detail;
+      setErr(fmtErr(detail) || e.message);
+      if (detail?.includes('تأكيد بريدك الإلكتروني')) {
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -110,7 +114,15 @@ export default function Login() {
               data-testid="login-password-input"
             />
           </div>
-          {err && <p className="text-sm text-red-600" data-testid="login-error">{err}</p>}
+          {err && (
+            <>
+              <p className="text-sm text-red-600" data-testid="login-error">{err}</p>
+              <p className="text-sm text-gray-600 mt-2">
+                إذا لم يصلك رابط التحقق، يمكنك الانتقال إلى 
+                <Link to={`/verify-email?email=${encodeURIComponent(email)}`} className="text-[#0a66c2] hover:underline">صفحة التحقق</Link>.
+              </p>
+            </>
+          )}
           {!cookieConsent && (
             <p className="text-sm text-gray-500">يجب الموافقة على الكوكيز قبل تسجيل الدخول.</p>
           )}

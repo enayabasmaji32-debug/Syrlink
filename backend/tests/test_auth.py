@@ -17,7 +17,9 @@ async def test_register_success():
         })
         assert response.status_code == 200
         data = response.json()
-        assert "token" in data
+        assert data["ok"] is True
+        assert data["verification_required"] is True
+        assert "token" not in data
         assert data["user"]["email"] == "test@example.com"
         assert data["user"]["name"] == "Test User"
 
@@ -43,24 +45,53 @@ async def test_register_duplicate_email():
 
 
 @pytest.mark.asyncio
-async def test_login_success():
-    """Test successful login."""
+async def test_login_unverified_user_is_blocked():
+    """Test login is blocked when email is not verified."""
     async with AsyncClient(app=app, base_url="http://test") as client:
-        # Register first
-        reg_response = await client.post("/api/auth/register", json={
-            "name": "Login Test",
-            "email": "login@example.com",
+        await client.post("/api/auth/register", json={
+            "name": "Unverified User",
+            "email": "unverified@example.com",
             "password": "Pass@1234"
         })
-        user_id = reg_response.json()["user"]["id"]
-        
-        # Login
+
         response = await client.post("/api/auth/login", json={
-            "email": "login@example.com",
+            "email": "unverified@example.com",
             "password": "Pass@1234"
         })
-        assert response.status_code == 200
-        assert "token" in response.json()
+        assert response.status_code == 403
+        assert "تأكيد بريدك" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_verify_email_allows_login():
+    """Test email verification allows the user to login."""
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        reg_response = await client.post("/api/auth/register", json={
+            "name": "Verify User",
+            "email": "verify@example.com",
+            "password": "Pass@1234"
+        })
+        assert reg_response.status_code == 200
+        created = reg_response.json()["user"]
+        assert created["email_verified"] is False
+
+        saved_user = await db.users.find_one({"id": created["id"]})
+        assert saved_user is not None
+        verify_token = saved_user["verify_token"]
+
+        verify_response = await client.post("/api/auth/verify-email", json={
+            "user_id": created["id"],
+            "token": verify_token,
+        })
+        assert verify_response.status_code == 200
+        assert verify_response.json()["ok"] is True
+
+        login_response = await client.post("/api/auth/login", json={
+            "email": "verify@example.com",
+            "password": "Pass@1234"
+        })
+        assert login_response.status_code == 200
+        assert "token" in login_response.json()
 
 
 @pytest.mark.asyncio
