@@ -23,10 +23,9 @@ CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "")
 CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "")
 
-# EmailJS
-EMAILJS_SERVICE_ID = os.environ.get("EMAILJS_SERVICE_ID", "service_corvet")
-EMAILJS_TEMPLATE_ID = os.environ.get("EMAILJS_TEMPLATE_ID", "template_u2f0z7t")
-EMAILJS_USER_ID = os.environ.get("EMAILJS_USER_ID", "EpgnqdYrlAEzFC11t")
+# Resend Email
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "re_Db7dSxFk_NjPVdVL81UkU2pGo3YLpKFky")
+RESEND_FROM = os.environ.get("RESEND_FROM", "noreply@syrlink.com")
 
 # App
 APP_URL = os.environ.get("APP_URL", "")
