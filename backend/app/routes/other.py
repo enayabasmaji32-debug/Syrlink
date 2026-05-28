@@ -98,8 +98,8 @@ async def admin_stats(admin: Annotated[dict, Depends(require_admin)]):
     responses={404: {"description": "User not found"}},
 )
 async def admin_list_users(
-    q: str = "",
     admin: Annotated[dict, Depends(require_admin)],
+    q: str = "",
 ):
     """List users (for admin)."""
     query = {}
@@ -153,8 +153,8 @@ async def admin_delete_user(
     responses={404: {"description": "No verification requests found"}},
 )
 async def admin_list_verifications(
-    status: str = "pending",
     admin: Annotated[dict, Depends(require_admin)],
+    status: str = "pending",
 ):
     """List verification requests."""
     reqs = await db.verification_requests.find({"status": status}, {"_id": 0}).sort("created_at", -1).to_list(200)
@@ -218,8 +218,8 @@ async def admin_reject_verification(
     responses={404: {"description": "No company requests found"}},
 )
 async def admin_list_company_requests(
-    status: str = "pending",
     admin: Annotated[dict, Depends(require_admin)],
+    status: str = "pending",
 ):
     """List company creation requests."""
     reqs = await db.company_requests.find({"status": status}, {"_id": 0}).sort("created_at", -1).to_list(200)
@@ -376,7 +376,7 @@ async def create_report(data: ReportIn, current: Annotated[dict, Depends(get_cur
     "/",
     responses={404: {"description": "Report not found"}},
 )
-async def get_reports(status: str = "pending", admin: Annotated[dict, Depends(require_admin)]):
+async def get_reports(admin: Annotated[dict, Depends(require_admin)], status: str = "pending"):
     """Get reports (admin only)."""
     query = {"status": status} if status else {}
     reports = await db.reports.find(query, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
@@ -412,9 +412,9 @@ async def get_reports(status: str = "pending", admin: Annotated[dict, Depends(re
 )
 async def resolve_report(
     report_id: str,
+    admin: Annotated[dict, Depends(require_admin)],
     action: str = "dismiss",
     data: ReportResolveIn = None,
-    admin: Annotated[dict, Depends(require_admin)],
 ):
     """Resolve a report (admin only). action: dismiss, remove_content, remove_user, suspend, reject"""
     reason = data.reason if data else ""
@@ -516,7 +516,7 @@ async def news():
 
 
 @admin_router.get("/companies")
-async def admin_list_companies(status: str = "approved", admin: Annotated[dict, Depends(require_admin)]):
+async def admin_list_companies(admin: Annotated[dict, Depends(require_admin)], status: str = "approved"):
     """List companies (for admin). Default shows approved companies."""
     query = {"status": status} if status else {}
     companies = await db.companies.find(query, {"_id": 0}).sort("created_at", -1).limit(200).to_list(200)
@@ -559,9 +559,9 @@ async def admin_delete_company(company_id: str, admin: Annotated[dict, Depends(r
     responses={400: {"description": "Invalid folder path or resource type"}},
 )
 async def cloudinary_signature(
-    folder: Annotated[str, Query("uploads/")],
-    resource_type: Annotated[str, Query("image")],
     current: Annotated[dict, Depends(get_current_user)],
+    folder: Annotated[str, Query] = Query("uploads/"),
+    resource_type: Annotated[str, Query] = Query("image"),
 ):
     """Get Cloudinary signed upload credentials."""
     allowed_prefixes = ("users/", "posts/", "uploads/", "verification/", "companies/")

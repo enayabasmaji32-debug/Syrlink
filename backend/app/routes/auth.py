@@ -226,7 +226,7 @@ async def register(data: RegisterIn, request: Request, background_tasks: Backgro
 
 @router.post("/verify-otp")
 @limiter.limit("10/minute")
-async def verify_email_otp(data: VerifyOtpIn):
+async def verify_email_otp(request: Request, data: VerifyOtpIn):
     """
     Verify OTP and mark email as verified.
     
@@ -312,7 +312,7 @@ async def verify_email_otp(data: VerifyOtpIn):
 
 @router.post("/resend-otp")
 @limiter.limit("10/minute")
-async def resend_otp(data: ResendVerificationIn, background_tasks: BackgroundTasks):
+async def resend_otp(request: Request, data: ResendVerificationIn, background_tasks: BackgroundTasks):
     """
     Resend OTP to email.
     
@@ -378,7 +378,7 @@ async def resend_otp(data: ResendVerificationIn, background_tasks: BackgroundTas
 
 @router.post("/login")
 @limiter.limit("5/minute")
-async def login(data: LoginIn):
+async def login(request: Request, data: LoginIn):
     """Login a user."""
     start_time = time.time()
     email = data.email.lower()
@@ -388,8 +388,6 @@ async def login(data: LoginIn):
     user = await db.users.find_one({"email": email})
     db_time = time.time() - db_start
     
-
-
     if not user:
         # Mitigate timing enumeration by sleeping a short, constant time
         await asyncio.sleep(0.5)
@@ -436,12 +434,12 @@ async def login(data: LoginIn):
     user.pop("_id", None)
     user.pop("password_hash", None)
     response = JSONResponse({"token": token, "user": user})
-        response.set_cookie(
+    response.set_cookie(
         key=JWT_COOKIE_NAME,
         value=token,
         httponly=True,
         secure=COOKIE_SECURE,
-            samesite="strict",
+        samesite="strict",
         max_age=JWT_COOKIE_MAX_AGE,
         path="/",
     )
