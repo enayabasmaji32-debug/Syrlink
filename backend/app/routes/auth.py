@@ -51,6 +51,10 @@ async def register(data: RegisterIn, request: Request):
     4. إرجاع رسالة نجاح مع بيانات المستخدم
     """
     try:
+        # ========== DIAGNOSTIC: Log email config at startup ==========
+        from app.config import RESEND_API_KEY as config_key
+        log.info(f"[register] 🔍 DIAGNOSTIC: RESEND_API_KEY is {'SET' if config_key else 'EMPTY/MISSING'} (len={len(config_key) if config_key else 0})")
+        
         # ========== خطوة 1: التحقق من صحة البيانات ==========
         if not data.name or not data.name.strip():
             log.warning("[register] ❌ Missing or empty name")
