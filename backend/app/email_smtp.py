@@ -3,12 +3,15 @@ import html
 import random
 import smtplib
 import ssl
+import time
+import socket
 from email.message import EmailMessage
 
 from app.config import GMAIL_PASS, GMAIL_USER, log
 
 GMAIL_SMTP_SERVER = "smtp.gmail.com"
-GMAIL_SMTP_PORT = 587
+GMAIL_SMTP_PORTS = [587, 465]
+GMAIL_SMTP_DEFAULT_PORT = GMAIL_SMTP_PORTS[0]
 
 
 def _generate_otp(length: int = 6) -> str:
@@ -37,13 +40,32 @@ def _send_email_smtp(to: str, subject: str, plain_text: str, html_body: str | No
     context = ssl.create_default_context()
 
     log.info(f"[email_smtp] Sending email to {to} via Gmail SMTP")
-    with smtplib.SMTP(GMAIL_SMTP_SERVER, GMAIL_SMTP_PORT, timeout=30) as server:
-        server.ehlo()
-        server.starttls(context=context)
-        server.ehlo()
-        server.login(GMAIL_USER, GMAIL_PASS)
-        server.send_message(email_message)
-    log.info(f"[email_smtp] Email sent successfully to {to}")
+    max_attempts = 3
+    last_exc: Exception | None = None
+
+    for attempt in range(1, max_attempts + 1):
+        for port in GMAIL_SMTP_PORTS:
+            try:
+                with smtplib.SMTP(GMAIL_SMTP_SERVER, port, timeout=30) as server:
+                    server.ehlo()
+                    if port == 587:
+                        server.starttls(context=context)
+                        server.ehlo()
+                    server.login(GMAIL_USER, GMAIL_PASS)
+                    server.send_message(email_message)
+                log.info(f"[email_smtp] Email sent successfully to {to} (port={port}, attempt={attempt})")
+                return
+            except (smtplib.SMTPException, OSError, socket.error) as exc:
+                last_exc = exc
+                log.warning(f"[email_smtp] send attempt {attempt} failed for {to} on port {port}: {exc}")
+        # exponential backoff before next attempt
+        sleep_seconds = 2 ** (attempt - 1)
+        log.info(f"[email_smtp] waiting {sleep_seconds}s before retrying email send to {to}")
+        time.sleep(sleep_seconds)
+
+    log.error(f"[email_smtp] All send attempts failed for {to}: {last_exc}")
+    if last_exc:
+        raise last_exc
 
 
 async def sendOTP(to: str, code: str = "", name: str = "", link: str | None = None) -> str:
@@ -71,7 +93,10 @@ async def sendOTP(to: str, code: str = "", name: str = "", link: str | None = No
     plain_text += "If you did not request this, please ignore this email.\n"
     html_body += "<p>If you did not request this, please ignore this email.</p>"
 
-    await asyncio.to_thread(_send_email_smtp, to, "Your SyrLink verification code", plain_text, html_body)
+    try:
+        await asyncio.to_thread(_send_email_smtp, to, "Your SyrLink verification code", plain_text, html_body)
+    except Exception as exc:
+        log.error(f"[sendOTP] Failed to send OTP email to {to}: {exc}")
     return code
 
 
@@ -98,5 +123,8 @@ async def send_password_reset_email(to: str, reset_link: str, name: str = ""):
         "<p>If you did not request this, please ignore this email.</p>"
     )
 
-    await asyncio.to_thread(_send_email_smtp, to, "SyrLink password reset request", plain_text, html_body)
-    log.info(f"[email_smtp] Password reset email sent successfully to {to}")
+    try:
+        await asyncio.to_thread(_send_email_smtp, to, "SyrLink password reset request", plain_text, html_body)
+        log.info(f"[email_smtp] Password reset email sent successfully to {to}")
+    except Exception as exc:
+        log.error(f"[email_smtp] Failed to send password reset email to {to}: {exc}")
