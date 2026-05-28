@@ -59,7 +59,7 @@ class UserPublic(BaseModel):
 class RegisterIn(BaseModel):
     name: str = Field(min_length=2, max_length=100)
     email: EmailStr
-    password: str = Field(min_length=6, max_length=100)
+    password: str = Field(min_length=8, max_length=100)
     headline: Optional[str] = Field(default="", max_length=200)
 
 
@@ -111,9 +111,9 @@ class ForgotPasswordIn(BaseModel):
 
 
 class ResetPasswordIn(BaseModel):
-    user_id: str
+    # API now accepts the reset token (no user_id) and the new password.
     token: str
-    new_password: str = Field(min_length=6)
+    new_password: str = Field(min_length=8)
 
 
 # ===========================================================================

@@ -108,6 +108,22 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     if not user.get("email_verified"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified")
+    # Ensure suspended users cannot use existing valid tokens
+    if user.get("suspended"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account suspended")
+
+    # Token revocation: if the user has a token_revoked_at timestamp, ensure token was issued after it
+    token_iat = payload.get("iat")
+    if token_iat and user.get("token_revoked_at"):
+        try:
+            from datetime import datetime, timezone
+            token_iat_dt = datetime.fromtimestamp(int(token_iat), timezone.utc)
+            revoked_dt = datetime.fromisoformat(user.get("token_revoked_at"))
+            if token_iat_dt <= revoked_dt:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revoked")
+        except ValueError:
+            # If parsing fails, be conservative and reject
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     return user
 
 

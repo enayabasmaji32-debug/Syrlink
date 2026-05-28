@@ -8,6 +8,8 @@ import asyncio
 import random
 import string
 from urllib.parse import urlencode
+import secrets
+import re
 
 from app.models import (
     RegisterIn, LoginIn, VerifyEmailIn, VerifyOtpIn, ResendVerificationIn, ForgotPasswordIn, ResetPasswordIn
@@ -15,7 +17,7 @@ from app.models import (
 from app.security import hash_password, verify_password, create_token, get_current_user
 from app.utils import uid, now_iso
 from app.email_smtp import send_verification_email
-from app.otp_store import store_otp, verify_otp, clear_otp
+from app.otp_store import store_otp, verify_otp_async, clear_otp
 from app.database import db
 from app.config import (
     APP_URL,
@@ -30,9 +32,13 @@ from app.config import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/register")
+@limiter.limit("10/minute")
 async def register(data: RegisterIn, request: Request, background_tasks: BackgroundTasks):
     """
     Register a new user and send OTP.
@@ -52,9 +58,14 @@ async def register(data: RegisterIn, request: Request, background_tasks: Backgro
             log.warning("[register] ❌ Missing or empty name")
             raise HTTPException(status_code=422, detail="Name is required and cannot be empty")
         
-        if not data.password or len(data.password) < 6:
+        if not data.password or len(data.password) < 8:
             log.warning("[register] ❌ Password too short")
-            raise HTTPException(status_code=422, detail="Password must be at least 6 characters")
+            raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
+
+        # Basic password strength: require upper, lower and digit
+        if not re.search(r"[A-Z]", data.password) or not re.search(r"[a-z]", data.password) or not re.search(r"[0-9]", data.password):
+            log.warning("[register] ❌ Password too weak")
+            raise HTTPException(status_code=422, detail="Password must include uppercase, lowercase and a digit")
         
         if not data.email or not data.email.strip():
             log.warning("[register] ❌ Missing or empty email")
@@ -82,7 +93,7 @@ async def register(data: RegisterIn, request: Request, background_tasks: Backgro
             log.info(f"[register] ℹ️ Email exists but not verified, resending OTP: {email}")
             otp_code = ''.join(random.choices(string.digits, k=6))
             store_otp(email, otp_code)
-            log.info(f"[register] 🔐 Generated new OTP for unverified user: {otp_code}")
+            log.info(f"[register] 🔐 Generated OTP for {email} (redacted)")
             
             background_tasks.add_task(
                 send_verification_email,
@@ -185,7 +196,7 @@ async def register(data: RegisterIn, request: Request, background_tasks: Backgro
         # ========== إرسال OTP ==========
         otp_code = ''.join(random.choices(string.digits, k=6))
         store_otp(email, otp_code)
-        log.info(f"[register] 🔐 Generated OTP: {otp_code}")
+        log.info(f"[register] 🔐 Generated OTP for {email} (redacted)")
         
         background_tasks.add_task(send_verification_email, email, otp_code, name, "")
         log.info(f"[register] 🔄 Scheduled OTP send in background for {email}")
@@ -214,6 +225,7 @@ async def register(data: RegisterIn, request: Request, background_tasks: Backgro
 
 
 @router.post("/verify-otp")
+@limiter.limit("10/minute")
 async def verify_email_otp(data: VerifyOtpIn):
     """
     Verify OTP and mark email as verified.
@@ -231,7 +243,7 @@ async def verify_email_otp(data: VerifyOtpIn):
         log.info(f"[verify-otp] 🔐 Verifying OTP for: {email}")
         
         # ========== خطوة 1: التحقق من الرمز ==========
-        if not verify_otp(email, otp_code):
+        if not await verify_otp_async(email, otp_code):
             log.warning(f"[verify-otp] ❌ Invalid or expired OTP for {email}")
             raise HTTPException(
                 status_code=401, 
@@ -254,7 +266,6 @@ async def verify_email_otp(data: VerifyOtpIn):
             {"email": email},
             {"$set": {
                 "email_verified": True,
-                "verified": True,
                 "last_seen": now_iso()
             }}
         )
@@ -283,7 +294,7 @@ async def verify_email_otp(data: VerifyOtpIn):
             value=token,
             httponly=True,
             secure=COOKIE_SECURE,
-            samesite="lax",
+            samesite="strict",
             max_age=JWT_COOKIE_MAX_AGE,
             path="/",
         )
@@ -300,6 +311,7 @@ async def verify_email_otp(data: VerifyOtpIn):
 
 
 @router.post("/resend-otp")
+@limiter.limit("10/minute")
 async def resend_otp(data: ResendVerificationIn, background_tasks: BackgroundTasks):
     """
     Resend OTP to email.
@@ -336,7 +348,7 @@ async def resend_otp(data: ResendVerificationIn, background_tasks: BackgroundTas
         log.info(f"[resend-otp] 🔐 Generating new OTP for unverified user: {email}")
         otp_code = ''.join(random.choices(string.digits, k=6))
         store_otp(email, otp_code)
-        log.info(f"[resend-otp] 🔐 Generated OTP: {otp_code}")
+        log.info(f"[resend-otp] 🔐 Generated OTP for {email} (redacted)")
         
         # إرسال الإيميل في الخلفية
         background_tasks.add_task(
@@ -365,6 +377,7 @@ async def resend_otp(data: ResendVerificationIn, background_tasks: BackgroundTas
 
 
 @router.post("/login")
+@limiter.limit("5/minute")
 async def login(data: LoginIn):
     """Login a user."""
     start_time = time.time()
@@ -376,16 +389,14 @@ async def login(data: LoginIn):
     db_time = time.time() - db_start
     
 
+
     if not user:
+        # Mitigate timing enumeration by sleeping a short, constant time
+        await asyncio.sleep(0.5)
         log.warning(f"Login failed: user not found - {email} (DB query: {db_time:.3f}s)")
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    # Check if user is suspended
-    if user.get("suspended", False):
-        reason = user.get("suspend_reason", "تم تعليق حسابك من قبل الإدارة.")
-        raise HTTPException(status_code=403, detail=f"لقد قمنا بتعليق حسابك: {reason}")
-
-    # Verify password
+    # Verify password first to avoid revealing account state via different timing
     pwd_start = time.time()
     password_valid = await verify_password(data.password, user.get("password_hash", ""))
     pwd_time = time.time() - pwd_start
@@ -393,6 +404,11 @@ async def login(data: LoginIn):
     if not password_valid:
         log.warning(f"Login failed: invalid password - {email} (DB: {db_time:.3f}s, PWD: {pwd_time:.3f}s)")
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    # Now check if user is suspended
+    if user.get("suspended", False):
+        reason = user.get("suspend_reason", "تم تعليق حسابك من قبل الإدارة.")
+        raise HTTPException(status_code=403, detail=f"لقد قمنا بتعليق حسابك: {reason}")
 
     # Check email verification status BEFORE allowing login
     if not user.get("email_verified"):
@@ -420,12 +436,12 @@ async def login(data: LoginIn):
     user.pop("_id", None)
     user.pop("password_hash", None)
     response = JSONResponse({"token": token, "user": user})
-    response.set_cookie(
+        response.set_cookie(
         key=JWT_COOKIE_NAME,
         value=token,
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="lax",
+            samesite="strict",
         max_age=JWT_COOKIE_MAX_AGE,
         path="/",
     )
@@ -451,10 +467,11 @@ async def logout() -> JSONResponse:
 
 
 @router.get("/google/login")
-async def google_login():
+async def google_login(request: Request):
     if not GOOGLE_CLIENT_ID or not GOOGLE_OAUTH_REDIRECT:
         raise HTTPException(status_code=500, detail="Google OAuth is not configured")
-
+    # Generate state parameter and store it in a short-lived httpOnly cookie
+    state = secrets.token_urlsafe(16)
     params = {
         "client_id": GOOGLE_CLIENT_ID,
         "redirect_uri": GOOGLE_OAUTH_REDIRECT,
@@ -462,16 +479,25 @@ async def google_login():
         "scope": "openid email profile",
         "access_type": "offline",
         "prompt": "select_account",
+        "state": state,
     }
-    return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}")
+    url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    resp = RedirectResponse(url)
+    resp.set_cookie("oauth_state", state, httponly=True, secure=COOKIE_SECURE, samesite="strict", max_age=300, path="/")
+    return resp
 
 
 @router.get("/google/callback")
-async def google_callback(code: str | None = None):
+async def google_callback(request: Request, code: str | None = None, state: str | None = None):
     if not code:
         raise HTTPException(status_code=400, detail="Missing Google authorization code")
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET or not GOOGLE_OAUTH_REDIRECT:
         raise HTTPException(status_code=500, detail="Google OAuth is not configured")
+
+    # Verify state matches cookie
+    cookie_state = request.cookies.get("oauth_state")
+    if not state or not cookie_state or state != cookie_state:
+        raise HTTPException(status_code=400, detail="Invalid OAuth state")
 
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(
@@ -542,7 +568,7 @@ async def google_callback(code: str | None = None):
         value=token,
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="lax",
+        samesite="strict",
         max_age=JWT_COOKIE_MAX_AGE,
         path="/",
     )
@@ -564,13 +590,15 @@ async def resend_verification(data: ResendVerificationIn, request: Request):
 
 
 @router.post("/forgot-password")
+@limiter.limit("5/minute")
 async def forgot_password(data: ForgotPasswordIn, request: Request):
     """Request password reset."""
     email = data.email.lower()
     user = await db.users.find_one({"email": email})
     # Always return ok to avoid email enumeration
     if user:
-        reset_token = uid()
+        # Use a cryptographically secure token
+        reset_token = secrets.token_urlsafe(32)
         await db.users.update_one(
             {"id": user["id"]},
             {"$set": {"reset_token": reset_token, "reset_token_at": now_iso()}},
@@ -580,7 +608,8 @@ async def forgot_password(data: ForgotPasswordIn, request: Request):
         async def send_email():
             try:
                 app_url = APP_URL or str(request.base_url).rstrip("/")
-                link = f"{app_url}/reset-password?token={reset_token}&uid={user['id']}"
+                # Do not include user id in URL (avoid leaking in logs/history); only include token
+                link = f"{app_url}/reset-password?token={reset_token}"
                 resend.Emails.send({
                     "from": RESEND_FROM,
                     "to": email,
@@ -600,13 +629,30 @@ async def forgot_password(data: ForgotPasswordIn, request: Request):
 @router.post("/reset-password")
 async def reset_password(data: ResetPasswordIn):
     """Reset password with token."""
-    user = await db.users.find_one({"id": data.user_id})
-    if not user or user.get("reset_token") != data.token:
+    # Find user by reset token only (avoid requiring user id in request)
+    user = await db.users.find_one({"reset_token": data.token})
+    if not user:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
-    
+
+    # Check expiry (1 hour)
+    try:
+        from datetime import datetime, timezone, timedelta
+        reset_at = user.get("reset_token_at")
+        if not reset_at:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+        reset_dt = datetime.fromisoformat(reset_at)
+        if (datetime.now(timezone.utc) - reset_dt) > timedelta(hours=1):
+            raise HTTPException(status_code=400, detail="Reset token expired")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid reset token")
+
+    # Password strength enforcement
+    if len(data.new_password) < 8 or not re.search(r"[A-Z]", data.new_password) or not re.search(r"[a-z]", data.new_password) or not re.search(r"[0-9]", data.new_password):
+        raise HTTPException(status_code=422, detail="Password must be at least 8 characters and include uppercase, lowercase and a digit")
+
     await db.users.update_one(
-        {"id": data.user_id},
-        {"$set": {"password_hash": hash_password(data.new_password)},
+        {"id": user["id"]},
+        {"$set": {"password_hash": hash_password(data.new_password), "token_revoked_at": now_iso()},
          "$unset": {"reset_token": "", "reset_token_at": ""}},
     )
     return {"ok": True}

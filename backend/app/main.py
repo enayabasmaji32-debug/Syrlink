@@ -125,8 +125,14 @@ if FRONTEND_BUILD_DIR.exists():
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str):
         requested_path = FRONTEND_BUILD_DIR / full_path
-        if requested_path.exists() and requested_path.is_file():
-            return FileResponse(requested_path)
+        try:
+            resolved = requested_path.resolve()
+        except Exception:
+            return FileResponse(FRONTEND_BUILD_DIR / "index.html")
+
+        # Ensure the resolved path is inside the frontend build directory to avoid path traversal
+        if str(resolved).startswith(str(FRONTEND_BUILD_DIR.resolve())) and resolved.exists() and resolved.is_file():
+            return FileResponse(resolved)
         return FileResponse(FRONTEND_BUILD_DIR / "index.html")
 
 

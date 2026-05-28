@@ -29,7 +29,19 @@ RESEND_FROM = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
 
 # App
 APP_URL = os.environ.get("APP_URL", "")
-CORS_ORIGINS = [origin.strip() for origin in os.environ.get("CORS_ORIGINS", "*").split(",")]
+# CORS: do not default to open wildcard in production. If CORS_ORIGINS is not set,
+# restrict to localhost for development. In production, require explicit config.
+raw_cors = os.environ.get("CORS_ORIGINS")
+if raw_cors:
+	CORS_ORIGINS = [origin.strip() for origin in raw_cors.split(",") if origin.strip()]
+else:
+	# default to localhost in dev to avoid open CORS
+	if os.environ.get("ENV", "dev").lower() == "production":
+		raise RuntimeError("CORS_ORIGINS must be set in production environment")
+	CORS_ORIGINS = ["http://localhost:3000"]
+
+# Redis (optional) for OTP/session storage
+REDIS_URL = os.environ.get("REDIS_URL", "")
 
 # OAuth / cookie settings
 JWT_COOKIE_NAME = os.environ.get("JWT_COOKIE_NAME", "li_token")
