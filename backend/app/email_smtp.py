@@ -6,8 +6,13 @@ from app.config import RESEND_API_KEY, RESEND_FROM, log
 RESEND_ENDPOINT = "https://api.resend.com/emails"
 
 
-def _send_resend_email(to: str, subject: str, text_body: str, html_body: str | None = None):
+def _send_resend_email(to: str, subject: str, text_body: str, html_body: str | None = None) -> str | None:
+    """Send email via Resend and return the email UUID."""
     log.info(f"[_send_resend_email] 🔍 CHECKPOINT A: _send_resend_email called for {to}")
+    
+    if not RESEND_API_KEY:
+        log.error("[_send_resend_email] RESEND_API_KEY is missing or empty")
+        raise RuntimeError("Resend API key is missing")
     
     payload = {
         "from": RESEND_FROM,
@@ -24,14 +29,22 @@ def _send_resend_email(to: str, subject: str, text_body: str, html_body: str | N
     }
     
     log.info(f"[_send_resend_email] 🔍 CHECKPOINT B: About to make HTTP POST to {RESEND_ENDPOINT}")
-    log.debug(f"[_send_resend_email] Headers: from={RESEND_FROM}, auth_key_len={len(RESEND_API_KEY) if RESEND_API_KEY else 0}")
+    log.debug(f"[_send_resend_email] Headers: from={RESEND_FROM}, auth_key_len={len(RESEND_API_KEY)}")
     
     try:
         response = httpx.post(RESEND_ENDPOINT, json=payload, headers=headers, timeout=30)
         log.info(f"[_send_resend_email] 🔍 CHECKPOINT C: HTTP response status={response.status_code} for {to}")
         response.raise_for_status()
         log.info(f"[_send_resend_email] ✅ CHECKPOINT D: Successfully sent email to {to}")
-        return response
+        
+        response_data = response.json()
+        email_id = response_data.get('id')
+        log.info(f"[_send_resend_email] 📧 Email UUID from Resend API: {email_id}")
+        
+        if not email_id:
+            log.warning("[_send_resend_email] ⚠️ No email ID returned from Resend API")
+        
+        return email_id
     except httpx.HTTPStatusError as exc:
         log.error(f"[_send_resend_email] 🔴 CHECKPOINT X: HTTP error sending email to {to}: {exc}")
         log.error("Resend response: %s", exc.response.text if exc.response is not None else "<no response>")
@@ -43,12 +56,12 @@ def _send_resend_email(to: str, subject: str, text_body: str, html_body: str | N
         raise
 
 
-async def sendOTP(to: str, code: str, name: str = "", link: str | None = None):
-    """Send OTP email via Resend only."""
+async def sendOTP(to: str, code: str, name: str = "", link: str | None = None) -> str | None:
+    """Send OTP email via Resend only. Returns the email UUID."""
     log.info(f"[sendOTP] 🔍 CHECKPOINT 1: sendOTP called for {to}")
     
     if not RESEND_API_KEY:
-        log.error(f"[sendOTP] 🔴 CHECKPOINT 2: RESEND_API_KEY is empty/missing! Value: '{RESEND_API_KEY}'")
+        log.error(f"[sendOTP] 🔴 CHECKPOINT 2: RESEND_API_KEY is empty/missing!")
         raise RuntimeError("Resend API key is missing")
     
     log.info(f"[sendOTP] ✓ CHECKPOINT 2: RESEND_API_KEY is set (length={len(RESEND_API_KEY)})")
@@ -65,8 +78,10 @@ async def sendOTP(to: str, code: str, name: str = "", link: str | None = None):
     html_text += "<p>If you did not request this, please ignore this email.</p>"
 
     log.info(f"[sendOTP] 🔍 CHECKPOINT 3: About to call asyncio.to_thread for {to}")
-    await asyncio.to_thread(_send_resend_email, to, "Your SyrLink verification code", plain_text, html_text)
-    log.info(f"[sendOTP] ✅ CHECKPOINT 4: Successfully sent verification email to {to} via Resend")
+    email_id = await asyncio.to_thread(_send_resend_email, to, "Your SyrLink verification code", plain_text, html_text)
+    log.info(f"[sendOTP] ✅ CHECKPOINT 4: Successfully sent verification email to {to} via Resend (ID: {email_id})")
+    
+    return email_id
 
 
 async def sendVerificationEmail(to: str, code: str, name: str = "", link: str | None = None):
