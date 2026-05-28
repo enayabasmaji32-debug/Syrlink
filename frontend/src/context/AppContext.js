@@ -64,9 +64,12 @@ export function AppProvider({ children }) {
       return;
     }
 
-    if (storedToken) {
-      setToken(storedToken);
+    if (!storedToken) {
+      setAuthReady(true);
+      return;
     }
+
+    setToken(storedToken);
 
     authApi.me()
       .then((me) => {

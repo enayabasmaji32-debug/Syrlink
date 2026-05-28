@@ -94,19 +94,24 @@ async def register(data: RegisterIn, request: Request):
             log.info(f"[register] 🔐 Generated OTP for {email} (redacted)")
             
             log.info(f"[register] 📨 Sending OTP resend email to {email}")
-            await send_verification_email(
-                email,
-                otp_code,
-                existing_user.get("name", "User"),
-                ""
-            )
-            log.info(f"[register] ✅ OTP resend email sent to {email}")
-            
+            try:
+                await send_verification_email(
+                    email,
+                    otp_code,
+                    existing_user.get("name", "User"),
+                    ""
+                )
+                log.info(f"[register] ✅ OTP resend email sent to {email}")
+                message = "This email is already registered but not verified. We've resent your verification code."
+            except Exception as email_err:
+                log.error(f"[register] ❌ OTP resend email failed for {email}: {email_err}", exc_info=True)
+                message = "This email is already registered but not verified. We could not send the code right now. Please try resending it."
+
             return JSONResponse(
                 status_code=200,
                 content={
                     "ok": True,
-                    "message": "This email is already registered but not verified. We've resent your verification code.",
+                    "message": message,
                     "user": {k: v for k, v in existing_user.items() if k not in ("password_hash", "_id")},
                     "verification_required": True,
                     "already_registered": True
@@ -197,9 +202,14 @@ async def register(data: RegisterIn, request: Request):
         log.info(f"[register] 🔐 Generated OTP for {email} (redacted)")
         
         log.info(f"[register] 📨 Sending OTP email to {email}")
-        await send_verification_email(email, otp_code, name, "")
-        log.info(f"[register] ✅ OTP email sent to {email}")
-        
+        email_message = "Registration successful! Please verify your email to complete signup."
+        try:
+            await send_verification_email(email, otp_code, name, "")
+            log.info(f"[register] ✅ OTP email sent to {email}")
+        except Exception as email_err:
+            log.error(f"[register] ❌ OTP email send failed for {email}: {email_err}", exc_info=True)
+            email_message = "Your account was created, but we could not send the verification email. Please try resending the code."
+
         user_out = {k: v for k, v in doc.items() if k not in ("password_hash", "_id")}
         log.info(f"[register] ✅ Registration completed successfully: {email}")
         
@@ -207,7 +217,7 @@ async def register(data: RegisterIn, request: Request):
             status_code=200,
             content={
                 "ok": True,
-                "message": "Registration successful! Please verify your email to complete signup.",
+                "message": email_message,
                 "user": user_out,
                 "verification_required": True
             }
