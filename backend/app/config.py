@@ -24,7 +24,7 @@ CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "")
 CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "")
 
 # Resend Email
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "re_Db7dSxFk_NjPVdVL81UkU2pGo3YLpKFky")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 RESEND_FROM = os.environ.get("RESEND_FROM", "noreply@syrlink.com")
 
 # App
