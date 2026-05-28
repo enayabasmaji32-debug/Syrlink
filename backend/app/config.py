@@ -46,6 +46,9 @@ COOKIE_SECURE = APP_URL.startswith("https://")
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
 GITHUB_OAUTH_REDIRECT = os.getenv("GITHUB_OAUTH_REDIRECT", "")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLECLIENTID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLECLIENTSECRET")
+GOOGLE_OAUTH_REDIRECT = os.getenv("GOOGLEREDIRECTURI", "")
 
 # Admin defaults
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@syrlink.com").lower()

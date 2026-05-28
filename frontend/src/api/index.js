@@ -9,6 +9,12 @@ export const authApi = {
     const origin = typeof globalThis !== 'undefined' && globalThis.location ? globalThis.location.origin : '';
     return `${normalizedBackendUrl || origin}/api/auth/github/login`;
   },
+  googleLoginUrl: () => {
+    const rawBackendUrl = process.env.REACT_APP_BACKEND_URL?.trim() || '';
+    const normalizedBackendUrl = rawBackendUrl === '/' ? '' : rawBackendUrl.replace(/\/$/, '');
+    const origin = typeof globalThis !== 'undefined' && globalThis.location ? globalThis.location.origin : '';
+    return `${normalizedBackendUrl || origin}/api/auth/google/login`;
+  },
 };
 
 export const usersApi = {

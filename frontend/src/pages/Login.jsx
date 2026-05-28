@@ -61,6 +61,18 @@ export default function Login() {
     window.location.assign(authApi.githubLoginUrl());
   };
 
+  const handleGoogleLogin = (e) => {
+    e.preventDefault();
+    setErr('');
+    if (!cookieConsent) {
+      setErr('يرجى الموافقة على الكوكيز للدخول');
+      setShowCookieModal(true);
+      return;
+    }
+    setLoading(true);
+    window.location.assign(authApi.googleLoginUrl());
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center pt-10 px-4 bg-[#f4f2ee]">
       <Link to="/" className="flex items-center gap-3 mb-8" data-testid="login-logo">
@@ -69,9 +81,9 @@ export default function Login() {
       </Link>
 
       <div className="li-card w-full max-w-md p-7 shadow-sm">
-        <h1 className="text-2xl font-bold mb-1">Sign in with GitHub</h1>
+        <h1 className="text-2xl font-bold mb-1">Sign in with GitHub or Google</h1>
         <p className="text-sm text-gray-600 mb-5">
-          Use GitHub to authenticate and access SyrLink securely.
+          Use GitHub or Google to authenticate and access SyrLink securely.
         </p>
 
         {err && <p className="text-sm text-red-600 mb-3" data-testid="login-error">{err}</p>}
@@ -86,12 +98,21 @@ export default function Login() {
           {loading ? 'Redirecting…' : 'Continue with GitHub'}
         </button>
 
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          disabled={loading || !cookieConsent}
+          className="w-full inline-flex items-center justify-center gap-2 mt-3 border border-gray-300 bg-white hover:bg-gray-100 disabled:bg-gray-100 text-gray-900 font-semibold rounded-full py-3 text-sm"
+        >
+          {loading ? 'Redirecting…' : 'Continue with Google'}
+        </button>
+
         {!cookieConsent && (
           <p className="text-sm text-gray-500 mt-3">يجب الموافقة على الكوكيز قبل تسجيل الدخول.</p>
         )}
 
         <div className="mt-6 text-sm text-gray-600">
-          <p>GitHub OAuth is the only authentication method supported by this application.</p>
+          <p>GitHub و Google OAuth هما طرق المصادقة الوحيدة المدعومة.</p>
           <p className="mt-2">
             If you need help, contact the team or review the terms and privacy policy.
           </p>
