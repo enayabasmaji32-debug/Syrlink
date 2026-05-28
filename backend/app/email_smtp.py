@@ -1,31 +1,28 @@
-import smtplib
 import asyncio
 import html
-from email.message import EmailMessage
-from app.config import BREVO_HOST, BREVO_PORT, BREVO_USER, BREVO_PASS, BREVO_FROM, log
+import resend
+from app.config import RESEND_API_KEY, RESEND_FROM, log
+
+resend.api_key = RESEND_API_KEY
 
 
-def _send_smtp_sync(to: str, subject: str, html: str, text: str | None = None):
-    msg = EmailMessage()
-    msg["From"] = BREVO_FROM
-    msg["To"] = to
-    msg["Subject"] = subject
+def _send_resend_email(to: str, subject: str, html: str, text: str | None = None):
+    if not RESEND_API_KEY:
+        raise RuntimeError("Resend API key not configured")
+
+    payload = {
+        "from": RESEND_FROM,
+        "to": to,
+        "subject": subject,
+        "html": html,
+    }
     if text:
-        msg.set_content(text)
-    msg.add_alternative(html, subtype="html")
-
-    if not BREVO_HOST or not BREVO_PORT:
-        raise RuntimeError("SMTP server not configured (BREVO_HOST/BREVO_PORT)")
-
-    with smtplib.SMTP(BREVO_HOST, BREVO_PORT, timeout=30) as s:
-        s.starttls()
-        if BREVO_USER and BREVO_PASS:
-            s.login(BREVO_USER, BREVO_PASS)
-        s.send_message(msg)
+        payload["text"] = text
+    resend.Emails.send(payload)
 
 
 async def send_verification_email(to: str, code: str, name: str = "", link: str | None = None):
-    """Send verification email via configured SMTP server (Brevo).
+    """Send verification email via Resend API only.
 
     This is async-friendly by delegating to a thread so it doesn't block the event loop.
     """
@@ -44,9 +41,8 @@ async def send_verification_email(to: str, code: str, name: str = "", link: str 
     parts.append('</div></div>')
     html = "".join(parts)
 
-    try:
-        await asyncio.to_thread(_send_smtp_sync, to, subject, html, text)
-        log.debug(f"Sent verification email to {to} via SMTP")
-    except Exception as e:
-        log.error(f"SMTP send failed for {to}: {e}")
-        raise
+    if not RESEND_API_KEY:
+        raise RuntimeError("Resend API key not configured")
+
+    await asyncio.to_thread(_send_resend_email, to, subject, html, text)
+    log.debug(f"Sent verification email to {to} via Resend API")

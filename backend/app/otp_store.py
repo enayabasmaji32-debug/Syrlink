@@ -39,13 +39,15 @@ async def _store_otp_async(email: str, otp_code: str) -> None:
 
 
 def store_otp(email: str, otp_code: str) -> None:
-    """Sync-friendly wrapper that schedules async storage."""
+    """Sync-friendly wrapper that stores locally immediately and schedules async storage."""
+    email_key = email.lower()
+    _otp_cache[email_key] = {"code": otp_code, "expires_at": time.time() + OTP_EXPIRY_SECONDS}
     try:
-        # schedule background task to store otp
-        asyncio.create_task(_store_otp_async(email, otp_code))
+        loop = asyncio.get_running_loop()
+        loop.create_task(_store_otp_async(email, otp_code))
     except RuntimeError:
-        # if there is no running loop (unlikely in FastAPI), perform sync fallback
-        _otp_cache[email.lower()] = {"code": otp_code, "expires_at": time.time() + OTP_EXPIRY_SECONDS}
+        # if there is no running loop (unlikely in FastAPI), keep the in-memory fallback only
+        pass
 
 
 async def verify_otp_async(email: str, otp_code: str) -> bool:
@@ -56,14 +58,15 @@ async def verify_otp_async(email: str, otp_code: str) -> bool:
     if _redis_client:
         try:
             val = await _redis_client.get(email_key)
-            if val is None:
+            if val is not None:
+                # redis returns bytes/str depending on client
+                stored_code = val.decode("utf-8") if isinstance(val, (bytes, bytearray)) else str(val)
+                if stored_code.strip() == otp_code.strip():
+                    await _redis_client.delete(email_key)
+                    _otp_cache.pop(email, None)
+                    return True
                 return False
-            # redis returns bytes/str depending on client
-            stored_code = val.decode("utf-8") if isinstance(val, (bytes, bytearray)) else str(val)
-            if stored_code.strip() != otp_code.strip():
-                return False
-            await _redis_client.delete(email_key)
-            return True
+            # No redis entry yet: fall back to in-memory cache below.
         except Exception as e:
             log.warning(f"Redis OTP verify failed, falling back to memory: {e}")
 
@@ -85,9 +88,9 @@ def clear_otp(email: str) -> None:
     email = email.lower()
     if _redis_client:
         try:
-            asyncio.create_task(_redis_client.delete(f"otp:{email}"))
-            return
-        except Exception:
+            loop = asyncio.get_running_loop()
+            loop.create_task(_redis_client.delete(f"otp:{email}"))
+        except RuntimeError:
             pass
     if email in _otp_cache:
         del _otp_cache[email]

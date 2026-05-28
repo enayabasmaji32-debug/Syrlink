@@ -1,7 +1,6 @@
 """Authentication routes."""
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, status, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
-import resend
 import time
 import httpx
 import asyncio
