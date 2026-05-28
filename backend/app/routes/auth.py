@@ -1,5 +1,5 @@
 """Authentication routes."""
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, status, Request, Response
+from fastapi import APIRouter, HTTPException, Depends, status, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 import time
 import httpx
@@ -37,7 +37,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 @router.post("/register")
 @limiter.limit("10/minute")
-async def register(data: RegisterIn, request: Request, background_tasks: BackgroundTasks):
+async def register(data: RegisterIn, request: Request):
     """
     Register a new user and send OTP.
     
@@ -93,14 +93,14 @@ async def register(data: RegisterIn, request: Request, background_tasks: Backgro
             store_otp(email, otp_code)
             log.info(f"[register] 🔐 Generated OTP for {email} (redacted)")
             
-            background_tasks.add_task(
-                send_verification_email,
+            log.info(f"[register] 📨 Sending OTP resend email to {email}")
+            await send_verification_email(
                 email,
                 otp_code,
                 existing_user.get("name", "User"),
                 ""
             )
-            log.info(f"[register] 🔄 Scheduled OTP resend in background for {email}")
+            log.info(f"[register] ✅ OTP resend email sent to {email}")
             
             return JSONResponse(
                 status_code=200,
@@ -161,8 +161,8 @@ async def register(data: RegisterIn, request: Request, background_tasks: Backgro
                         try:
                             otp_code = ''.join(random.choices(string.digits, k=6))
                             store_otp(email, otp_code)
-                            background_tasks.add_task(
-                                send_verification_email,
+                            log.info(f"[register] 📨 Sending duplicate OTP resend email to {email}")
+                            await send_verification_email(
                                 email,
                                 otp_code,
                                 existing.get("name", ""),
@@ -178,7 +178,7 @@ async def register(data: RegisterIn, request: Request, background_tasks: Backgro
                                 }
                             )
                         except Exception as email_err:
-                            log.error(f"[register] failed to schedule duplicate resend email: {email_err}")
+                            log.error(f"[register] failed to send duplicate resend email: {email_err}")
                             pass
                 raise HTTPException(
                     status_code=400, 
@@ -196,8 +196,9 @@ async def register(data: RegisterIn, request: Request, background_tasks: Backgro
         store_otp(email, otp_code)
         log.info(f"[register] 🔐 Generated OTP for {email} (redacted)")
         
-        background_tasks.add_task(send_verification_email, email, otp_code, name, "")
-        log.info(f"[register] 🔄 Scheduled OTP send in background for {email}")
+        log.info(f"[register] 📨 Sending OTP email to {email}")
+        await send_verification_email(email, otp_code, name, "")
+        log.info(f"[register] ✅ OTP email sent to {email}")
         
         user_out = {k: v for k, v in doc.items() if k not in ("password_hash", "_id")}
         log.info(f"[register] ✅ Registration completed successfully: {email}")
@@ -310,7 +311,7 @@ async def verify_email_otp(request: Request, data: VerifyOtpIn):
 
 @router.post("/resend-otp")
 @limiter.limit("10/minute")
-async def resend_otp(request: Request, data: ResendVerificationIn, background_tasks: BackgroundTasks):
+async def resend_otp(request: Request, data: ResendVerificationIn):
     """
     Resend OTP to email.
     
@@ -348,15 +349,14 @@ async def resend_otp(request: Request, data: ResendVerificationIn, background_ta
         store_otp(email, otp_code)
         log.info(f"[resend-otp] 🔐 Generated OTP for {email} (redacted)")
         
-        # إرسال الإيميل في الخلفية
-        background_tasks.add_task(
-            send_verification_email,
+        log.info(f"[resend-otp] 📨 Sending OTP resend email to {email}")
+        await send_verification_email(
             email,
             otp_code,
             user.get("name", "User"),
             ""
         )
-        log.info(f"[resend-otp] 🔄 Scheduled OTP send in background for {email}")
+        log.info(f"[resend-otp] ✅ OTP resend email sent to {email}")
         
         return JSONResponse({
             "ok": True,

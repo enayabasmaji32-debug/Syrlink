@@ -13,9 +13,23 @@ def _send_emailjs(to: str, params: dict):
         "user_id": EMAILJS_USER_ID,
         "template_params": params,
     }
-    response = httpx.post(EMAILJS_ENDPOINT, json=payload, timeout=30)
-    response.raise_for_status()
-    return response
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    try:
+        response = httpx.post(EMAILJS_ENDPOINT, json=payload, headers=headers, timeout=30)
+        response.raise_for_status()
+        return response
+    except httpx.HTTPStatusError as exc:
+        log.error(f"[emailjs] HTTP error sending email to {to}: {exc}")
+        log.error("EmailJS response: %s", exc.response.text if exc.response is not None else "<no response>")
+        log.debug("EmailJS request payload: %s", payload)
+        raise
+    except httpx.RequestError as exc:
+        log.error(f"[emailjs] Request error sending email to {to}: {exc}")
+        log.debug("EmailJS request payload: %s", payload)
+        raise
 
 
 async def send_verification_email(to: str, code: str, name: str = "", link: str | None = None):
