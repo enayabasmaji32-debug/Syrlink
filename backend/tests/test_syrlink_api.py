@@ -7,7 +7,7 @@ import requests
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") if os.environ.get("REACT_APP_BACKEND_URL") else "https://syrlink-server.preview.emergentagent.com"
 API = f"{BASE_URL}/api"
 
-DEMO = {"email": "demo@syrlink.com", "password": "demo1234"}
+DEMO = {"email": "demo@syrlink.com", "password": "Demo1234"}
 
 
 @pytest.fixture(scope="session")
@@ -31,7 +31,7 @@ def H(tok):
 # ---- AUTH ----
 def test_register_returns_token_and_user():
     email = f"TEST_{uuid.uuid4().hex[:10]}@syrlink.com"
-    r = requests.post(f"{API}/auth/register", json={"name": "Test U", "email": email, "password": "secret123"})
+    r = requests.post(f"{API}/auth/register", json={"name": "Test U", "email": email, "password": "Secret123"})
     assert r.status_code == 200, r.text
     data = r.json()
     assert "token" in data and isinstance(data["token"], str) and len(data["token"]) > 10
