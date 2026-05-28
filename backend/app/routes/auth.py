@@ -15,12 +15,11 @@ from app.models import (
 )
 from app.security import hash_password, verify_password, create_token, get_current_user
 from app.utils import uid, now_iso
-from app.email_smtp import send_verification_email
+from app.email_smtp import send_verification_email, send_password_reset_email
 from app.otp_store import store_otp, verify_otp_async, clear_otp
 from app.database import db
 from app.config import (
     APP_URL,
-    RESEND_FROM,
     log,
     JWT_COOKIE_NAME,
     JWT_COOKIE_MAX_AGE,
@@ -607,19 +606,13 @@ async def forgot_password(data: ForgotPasswordIn, request: Request):
                 app_url = APP_URL or str(request.base_url).rstrip("/")
                 # Do not include user id in URL (avoid leaking in logs/history); only include token
                 link = f"{app_url}/reset-password?token={reset_token}"
-                resend.Emails.send({
-                    "from": RESEND_FROM,
-                    "to": email,
-                    "subject": "Reset your SyrLink password",
-                    "html": f'<p>Hi {user["name"]},</p><p>Reset your password: <a href="{link}">Click here</a></p><p>This link expires in 1 hour. If you did not request this, ignore.</p>',
-                })
+                await send_password_reset_email(email, link, user.get("name", ""))
             except Exception as e:
                 log.warning(f"Reset email failed: {e}")
-        
+
         # Don't await - send in background
         import asyncio
         asyncio.create_task(send_email())
-    
     return {"ok": True}
 
 

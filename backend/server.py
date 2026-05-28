@@ -24,7 +24,6 @@ from typing import List, Optional, Literal, Dict, Any
 
 import bcrypt
 import jwt
-import resend
 import cloudinary
 import cloudinary.utils
 import cloudinary.uploader
@@ -58,10 +57,8 @@ cloudinary.config(
     secure=True,
 )
 
-resend.api_key = os.environ.get("RESEND_API_KEY", "")
-RESEND_FROM = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
 APP_URL = os.environ.get("APP_URL", "")
-from app.email_smtp import send_verification_email
+from app.email_smtp import send_verification_email, send_password_reset_email
 
 app = FastAPI(title="SyrLink API")
 api = APIRouter(prefix="/api")
@@ -345,43 +342,7 @@ async def verify_email(data: VerifyEmailIn):
 
 @api.post("/auth/resend-verification")
 async def resend_verification(data: ResendVerificationIn, request: Request):
-    email = data.email.lower().strip()
-    user = await db.users.find_one({"email": email})
-    if not user:
-        return {"ok": True, "already_sent": False}
-    if user.get("email_verified"):
-        return {"ok": True, "already_verified": True}
-
-    new_token = uid()
-    await db.users.update_one({"id": user["id"]}, {"$set": {"verify_token": new_token}})
-
-    app_url = APP_URL or str(request.base_url).rstrip("/")
-    if not app_url:
-        log.error("[resend_verification] APP_URL not configured and request URL unavailable, cannot send verification email")
-        raise HTTPException(status_code=500, detail="Server email configuration is missing")
-
-    link = f"{app_url}/verify-otp?email={email}"
-    try:
-        user_name = user.get('name', '')
-        resend.Emails.send({
-            "from": RESEND_FROM,
-            "to": email,
-            "subject": "Verify your SyrLink email",
-            "text": f"Hi {user_name},\n\nPlease verify your SyrLink account by visiting the link below:\n{link}\n\nIf the link does not work, use this code: {new_token}\n\nThank you.",
-            "html": (
-                '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;background:#f4f2ee">'
-                '<div style="background:white;border-radius:8px;padding:32px;text-align:center">'
-                '<h1 style="color:#0a66c2;margin:0 0 8px">Verify your email</h1>'
-                '<p style="color:#555">Hi {name}, please confirm your email to activate your account.</p>'
-                '<p style="color:#333;margin-top:8px">Your verification code is: <strong>{code}</strong></p>'
-                '<a href="{link}" style="display:inline-block;margin-top:16px;background:#0a66c2;color:white;text-decoration:none;padding:12px 28px;border-radius:24px;font-weight:600">Verify email</a>'
-                '<p style="font-size:11px;color:#888;margin-top:24px">Connecting Talent. Building Futures.</p>'
-                '</div></div>'
-            ).format(name=user_name, code=new_token, link=link),
-        })
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not send email: {e}")
-    return {"ok": True, "resent": True}
+    raise HTTPException(status_code=410, detail="Deprecated endpoint. Use /auth/resend-otp instead.")
 
 
 class ForgotPasswordIn(BaseModel):
@@ -402,12 +363,7 @@ async def forgot_password(data: ForgotPasswordIn, request: Request):
         try:
             app_url = APP_URL or str(request.base_url).rstrip("/")
             link = f"{app_url}/reset-password?token={reset_token}&uid={user['id']}"
-            resend.Emails.send({
-                "from": RESEND_FROM,
-                "to": email,
-                "subject": "Reset your SyrLink password",
-                "html": f'<p>Hi {user["name"]},</p><p>Reset your password: <a href="{link}">Click here</a></p><p>This link expires in 1 hour. If you did not request this, ignore.</p>',
-            })
+            await send_password_reset_email(email, link, user.get("name", ""))
         except Exception as e:
             log.warning(f"Reset email failed: {e}")
     return {"ok": True}

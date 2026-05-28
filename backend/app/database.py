@@ -2,10 +2,9 @@
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 import cloudinary
 import cloudinary.utils
-import resend
 import logging
 
-from app.config import MONGO_URL, DB_NAME, CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, RESEND_API_KEY
+from app.config import MONGO_URL, DB_NAME, CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 
 log = logging.getLogger("syrlink")
 
@@ -38,8 +37,6 @@ cloudinary.config(
     secure=True,
 )
 
-# Resend configuration
-resend.api_key = RESEND_API_KEY
 
 
 def get_db() -> AsyncIOMotorDatabase:

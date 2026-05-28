@@ -1,48 +1,47 @@
 import asyncio
 import html
-import resend
-from app.config import RESEND_API_KEY, RESEND_FROM, log
+import httpx
+from app.config import EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_USER_ID, log
 
-resend.api_key = RESEND_API_KEY
+EMAILJS_ENDPOINT = "https://api.emailjs.com/api/v1.0/email/send"
 
 
-def _send_resend_email(to: str, subject: str, html: str, text: str | None = None):
-    if not RESEND_API_KEY:
-        raise RuntimeError("Resend API key not configured")
-
+def _send_emailjs(to: str, params: dict):
     payload = {
-        "from": RESEND_FROM,
-        "to": to,
-        "subject": subject,
-        "html": html,
+        "service_id": EMAILJS_SERVICE_ID,
+        "template_id": EMAILJS_TEMPLATE_ID,
+        "user_id": EMAILJS_USER_ID,
+        "template_params": params,
     }
-    if text:
-        payload["text"] = text
-    resend.Emails.send(payload)
+    response = httpx.post(EMAILJS_ENDPOINT, json=payload, timeout=30)
+    response.raise_for_status()
+    return response
 
 
 async def send_verification_email(to: str, code: str, name: str = "", link: str | None = None):
-    """Send verification email via Resend API only.
+    """Send verification email via EmailJS only."""
+    if not EMAILJS_SERVICE_ID or not EMAILJS_TEMPLATE_ID or not EMAILJS_USER_ID:
+        raise RuntimeError("EmailJS configuration is missing")
 
-    This is async-friendly by delegating to a thread so it doesn't block the event loop.
-    """
-    subject = "Verify your SyrLink email"
-    safe_name = html.escape(name or "")
-    text = f"Hi {name},\n\nYour verification code: {code}\n\n" + (f"Link: {link}\n\n" if link else "") + "Thanks."
-    parts = []
-    parts.append('<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;background:#f4f2ee">')
-    parts.append('<div style="background:white;border-radius:8px;padding:32px;text-align:center">')
-    parts.append('<h1 style="color:#0a66c2;margin:0 0 8px">Verify your email</h1>')
-    parts.append(f'<p style="color:#555">Hi {safe_name}, please confirm your email to activate your account.</p>')
-    parts.append(f'<p style="color:#333;margin-top:8px">Your verification code is: <strong>{html.escape(code)}</strong></p>')
-    if link:
-        parts.append(f'<a href="{link}" style="display:inline-block;margin-top:16px;background:#0a66c2;color:white;text-decoration:none;padding:12px 28px;border-radius:24px;font-weight:600">Verify email</a>')
-    parts.append('<p style="font-size:11px;color:#888;margin-top:24px">Connecting Talent. Building Futures.</p>')
-    parts.append('</div></div>')
-    html = "".join(parts)
+    params = {
+        "email": to,
+        "passcode": code,
+        "name": html.escape(name or ""),
+        "link": link or "",
+    }
+    await asyncio.to_thread(_send_emailjs, to, params)
+    log.debug(f"Sent verification email to {to} via EmailJS")
 
-    if not RESEND_API_KEY:
-        raise RuntimeError("Resend API key not configured")
 
-    await asyncio.to_thread(_send_resend_email, to, subject, html, text)
-    log.debug(f"Sent verification email to {to} via Resend API")
+async def send_password_reset_email(to: str, reset_link: str, name: str = ""):
+    """Send password reset email via EmailJS only."""
+    if not EMAILJS_SERVICE_ID or not EMAILJS_TEMPLATE_ID or not EMAILJS_USER_ID:
+        raise RuntimeError("EmailJS configuration is missing")
+
+    params = {
+        "email": to,
+        "reset_link": reset_link,
+        "name": html.escape(name or ""),
+    }
+    await asyncio.to_thread(_send_emailjs, to, params)
+    log.debug(f"Sent password reset email to {to} via EmailJS")
