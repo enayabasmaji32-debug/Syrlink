@@ -31,7 +31,6 @@ const eraseCookie = (name) => {
 export function AppProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
-  const [token, setToken] = useState(localStorage.getItem('li_token'));
 
   const [posts, setPosts] = useState([]);
   const [commentsByPost, setCommentsByPost] = useState({});
@@ -50,12 +49,11 @@ export function AppProvider({ children }) {
   const [createContentType, setCreateContentType] = useState(null); // 'post' | 'article' | 'event'
 
   // WebSocket for real-time online status
-  const { onlineUsers, isUserOnline } = useOnlineStatus(token);
+  const { onlineUsers, isUserOnline } = useOnlineStatus();
 
   // On mount: try to restore session - NON-BLOCKING
   useEffect(() => {
     const storedConsent = getCookie('li_cookie_consent') === 'yes';
-    const storedToken = localStorage.getItem('li_token');
 
     if (!storedConsent) {
       localStorage.removeItem('li_token');
@@ -63,13 +61,6 @@ export function AppProvider({ children }) {
       setAuthReady(true);
       return;
     }
-
-    if (!storedToken) {
-      setAuthReady(true);
-      return;
-    }
-
-    setToken(storedToken);
 
     authApi.me()
       .then((me) => {
@@ -79,7 +70,6 @@ export function AppProvider({ children }) {
       .catch(() => {
         localStorage.removeItem('li_token');
         eraseCookie('li_token');
-        setToken(null);
         setUser(null);
         setAuthReady(true);
       });
@@ -224,23 +214,6 @@ export function AppProvider({ children }) {
     };
   }, [user?.id]); // Only depend on user.id to prevent recreating interval
 
-  const login = async (email, password) => {
-    const { token, user: u } = await authApi.login({ email, password });
-    localStorage.setItem('li_token', token);
-    setCookie('li_cookie_consent', 'yes', { maxAge: 31536000 });
-    setToken(token);
-    setUser(u);
-    // Defer non-critical data loading to avoid blocking UI
-    Promise.allSettled([refreshAll(u), loadOwnedCompanies(u)]);
-    return u;
-  };
-
-  const register = async (data) => {
-    const result = await authApi.register(data);
-    setCookie('li_cookie_consent', 'yes', { maxAge: 31536000 });
-    return result;
-  };
-
   const logout = async () => {
     try {
       await authApi.logout();
@@ -250,7 +223,6 @@ export function AppProvider({ children }) {
     localStorage.removeItem('li_token');
     localStorage.removeItem('li_active_company');
     eraseCookie('li_token');
-    setToken(null);
     setUser(null);
     setPosts([]); setCommentsByPost({}); setOwnedCompanies([]); setActiveCompanyId(''); setPeople([]); setNetworkUsers([]); setInvitations([]);
     setConnections(new Set()); setPendingSent(new Set());
@@ -493,7 +465,7 @@ export function AppProvider({ children }) {
   }, [translationMemo]);
 
   const value = useMemo(() => ({
-    user, authReady, login, register, logout, setUser,
+    user, authReady, logout, setUser,
     posts, commentsByPost, addPost, toggleLike, addComment, loadComments, repostPost, deletePost, updatePost,
     ownedCompanies, activeCompany, setActiveCompany,
     people, networkUsers, invitations, connections, pendingSent,

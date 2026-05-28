@@ -15,8 +15,6 @@ import MyApplications from './pages/MyApplications';
 import Messaging from './pages/Messaging';
 import Notifications from './pages/Notifications';
 import Login from './pages/Login';
-import Register from './pages/Register';
-import VerifyOtp from './pages/VerifyOtp';
 import AdminPanel from './pages/AdminPanel';
 import MyCompanyRequests from './pages/MyCompanyRequests';
 import PositionRequests from './pages/PositionRequests';
@@ -24,7 +22,6 @@ import EditCompany from './pages/EditCompany';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfUse from './pages/TermsOfUse';
 import Nda from './pages/NDA';
-import { ForgotPassword, ResetPassword } from './pages/PasswordReset';
 import { Toaster } from './components/ui/sonner';
 
 class ErrorBoundary extends React.Component {
@@ -111,13 +108,9 @@ function Shell() {
   return (
     <Routes>
       <Route path="/login" element={<PublicPage><Login /></PublicPage>} />
-      <Route path="/register" element={<PublicPage><Register /></PublicPage>} />
-      <Route path="/verify-otp" element={<PublicPage><VerifyOtp /></PublicPage>} />
       <Route path="/privacy" element={<PublicPage><PrivacyPolicy /></PublicPage>} />
       <Route path="/terms" element={<PublicPage><TermsOfUse /></PublicPage>} />
       <Route path="/nda" element={<PublicPage><Nda /></PublicPage>} />
-      <Route path="/forgot-password" element={<PublicPage><ForgotPassword /></PublicPage>} />
-      <Route path="/reset-password" element={<PublicPage><ResetPassword /></PublicPage>} />
       <Route path="/" element={<Protected><Feed /></Protected>} />
       <Route path="/feed" element={<Navigate to="/" replace />} />
       <Route path="/in/:userId" element={<Protected><Profile /></Protected>} />

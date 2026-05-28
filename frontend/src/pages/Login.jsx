@@ -1,21 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { authApi } from '../api';
-import { toast } from 'sonner';
-
-function fmtErr(d) {
-  if (!d) return 'Something went wrong';
-  if (typeof d === 'string') return d;
-  if (Array.isArray(d)) return d.map((e) => e?.msg || JSON.stringify(e)).join(' ');
-  return d?.msg || JSON.stringify(d);
-}
 
 export default function Login() {
-  const { login, user, authReady } = useApp();
-  const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { user, authReady } = useApp();
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [cookieConsent, setCookieConsent] = useState(false);
@@ -60,7 +49,7 @@ export default function Login() {
     setErr('يرجى الموافقة على الكوكيز للدخول');
   };
 
-  const submit = async (e) => {
+  const handleGitHubLogin = (e) => {
     e.preventDefault();
     setErr('');
     if (!cookieConsent) {
@@ -69,26 +58,7 @@ export default function Login() {
       return;
     }
     setLoading(true);
-    try {
-      await login(email, password);
-      toast.success('Welcome back!');
-      navigate('/');
-    } catch (e) {
-      const detail = e.response?.data?.detail;
-      const status = e.response?.status;
-      
-      // Handle email verification required (403)
-      if (status === 403 && detail?.includes('verify')) {
-        toast.error('Please verify your email first');
-        setErr('');
-        navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
-        return;
-      }
-      
-      setErr(fmtErr(detail) || e.message);
-    } finally {
-      setLoading(false);
-    }
+    window.location.assign(authApi.githubLoginUrl());
   };
 
   return (
@@ -97,84 +67,37 @@ export default function Login() {
         <img src="/syrlink-logo.png" alt="SyrLink" className="w-14 h-14 object-contain" />
         <span className="text-[#0a66c2] font-bold text-4xl tracking-tight">SyrLink</span>
       </Link>
+
       <div className="li-card w-full max-w-md p-7 shadow-sm">
-        <h1 className="text-2xl font-bold mb-1">Sign in</h1>
-        <p className="text-sm text-gray-600 mb-5">Stay connected with your professional world.</p>
-        <form onSubmit={submit} className="space-y-3">
-          <div>
-            <label htmlFor="login-email" className="text-xs font-semibold text-gray-700">Email</label>
-            <input
-              id="login-email"
-              type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              className="w-full mt-1 border border-gray-400 rounded px-3 py-2 text-sm focus:outline-none focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/30"
-              data-testid="login-email-input"
-            />
-          </div>
-          <div>
-            <label htmlFor="login-password" className="text-xs font-semibold text-gray-700">Password</label>
-            <input
-              id="login-password"
-              type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              className="w-full mt-1 border border-gray-400 rounded px-3 py-2 text-sm focus:outline-none focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/30"
-              data-testid="login-password-input"
-            />
-          </div>
-          {err && (
-            <>
-              <p className="text-sm text-red-600" data-testid="login-error">{err}</p>
-              <p className="text-sm text-gray-600 mt-2">
-                إذا لم يصلك رابط التحقق، يمكنك الانتقال إلى 
-                <Link to={`/verify-otp?email=${encodeURIComponent(email)}`} className="text-[#0a66c2] hover:underline">صفحة التحقق</Link>.
-              </p>
-            </>
-          )}
-          {!cookieConsent && (
-            <p className="text-sm text-gray-500">يجب الموافقة على الكوكيز قبل تسجيل الدخول.</p>
-          )}
-          <button
-            type="submit" disabled={loading || !cookieConsent}
-            className="w-full bg-[#0a66c2] hover:bg-[#004182] disabled:bg-gray-300 text-white font-semibold rounded-full py-2.5 text-sm"
-            data-testid="login-submit"
-          >
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-          <a
-            href={cookieConsent ? authApi.googleLoginUrl() : '#'}
-            onClick={(e) => {
-              if (!cookieConsent) {
-                e.preventDefault();
-                setErr('يرجى الموافقة على الكوكيز قبل تسجيل الدخول');
-                setShowCookieModal(true);
-              }
-            }}
-            className="w-full inline-flex items-center justify-center gap-2 mt-3 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-full py-2 text-sm"
-            rel="noopener noreferrer"
-          >
-            Continue with Google
-          </a>
-        </form>
-        <div className="flex items-center my-5 text-xs text-gray-500">
-          <div className="flex-1 border-t border-gray-300" />
-          <span className="mx-2">or</span>
-          <div className="flex-1 border-t border-gray-300" />
-        </div>
-        <div className="text-center">
-          <Link to="/forgot-password" className="text-sm text-[#0a66c2] hover:underline" data-testid="login-forgot-link">Forgot password?</Link>
-        </div>
-        <p className="text-center text-sm">
-          New to SyrLink?{' '}
-          <Link to="/register" className="text-[#0a66c2] font-semibold hover:underline" data-testid="login-to-register">
-            Join now
-          </Link>
+        <h1 className="text-2xl font-bold mb-1">Sign in with GitHub</h1>
+        <p className="text-sm text-gray-600 mb-5">
+          Use GitHub to authenticate and access SyrLink securely.
         </p>
-        <div className="mt-3 text-center text-sm">
-          <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#0a66c2] hover:underline ml-3">شروط الاستخدام</a>
-          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#0a66c2] hover:underline ml-3">سياسة الخصوصية</a>
-          <a href="/nda" target="_blank" rel="noopener noreferrer" className="text-[#0a66c2] hover:underline">اتفاقية عدم الإفصاح (NDA)</a>
+
+        {err && <p className="text-sm text-red-600 mb-3" data-testid="login-error">{err}</p>}
+
+        <button
+          type="button"
+          onClick={handleGitHubLogin}
+          disabled={loading || !cookieConsent}
+          className="w-full inline-flex items-center justify-center gap-2 bg-[#0a66c2] hover:bg-[#004182] disabled:bg-gray-300 text-white font-semibold rounded-full py-3 text-sm"
+          data-testid="login-submit"
+        >
+          {loading ? 'Redirecting…' : 'Continue with GitHub'}
+        </button>
+
+        {!cookieConsent && (
+          <p className="text-sm text-gray-500 mt-3">يجب الموافقة على الكوكيز قبل تسجيل الدخول.</p>
+        )}
+
+        <div className="mt-6 text-sm text-gray-600">
+          <p>GitHub OAuth is the only authentication method supported by this application.</p>
+          <p className="mt-2">
+            If you need help, contact the team or review the terms and privacy policy.
+          </p>
         </div>
       </div>
+
       {!cookieConsent && showCookieModal && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-3xl px-4">
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-4 flex items-center gap-4 text-right">
@@ -193,14 +116,9 @@ export default function Login() {
             <div className="flex-1">
               <p className="text-sm text-gray-700 dark:text-gray-200 leading-tight">
                 نستخدم الكوكيز لحفظ الجلسة وتأمين تسجيل الدخول وتخزين تفضيلاتك. للموافقة على الدخول، ضع علامة (✓) بالمربع.
-                بفتح الروابط، اطلع على
-                {' '}
-                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#0a66c2] hover:underline">شروط الاستخدام</a>
-                ,
-                {' '}
-                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#0a66c2] hover:underline">سياسة الخصوصية</a>
-                {' '}و
-                {' '}
+                بفتح الروابط، اطلع على {' '}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#0a66c2] hover:underline">شروط الاستخدام</a>, {' '}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#0a66c2] hover:underline">سياسة الخصوصية</a> و {' '}
                 <a href="/nda" target="_blank" rel="noopener noreferrer" className="text-[#0a66c2] hover:underline">اتفاقية عدم الإفصاح (NDA)</a>.
               </p>
             </div>

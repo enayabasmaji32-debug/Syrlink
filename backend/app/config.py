@@ -23,10 +23,6 @@ CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "")
 CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "")
 CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "")
 
-# Gmail SMTP Email
-GMAIL_USER = os.environ.get("GMAIL_USER", "basmajienaya@gmail.com")
-GMAIL_PASS = os.environ.get("GMAIL_PASS", "")
-
 # App
 APP_URL = os.environ.get("APP_URL", "")
 # CORS: do not default to open wildcard in production. If CORS_ORIGINS is not set,
@@ -47,9 +43,9 @@ REDIS_URL = os.environ.get("REDIS_URL", "")
 JWT_COOKIE_NAME = os.environ.get("JWT_COOKIE_NAME", "li_token")
 JWT_COOKIE_MAX_AGE = int(os.environ.get("JWT_COOKIE_MAX_AGE", "604800"))  # 7 days
 COOKIE_SECURE = APP_URL.startswith("https://")
-GOOGLE_CLIENT_ID = os.getenv("GOOGLECLIENTID")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLECLIENTSECRET")
-GOOGLE_OAUTH_REDIRECT = os.getenv("GOOGLEREDIRECTURI", "")
+GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
+GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
+GITHUB_OAUTH_REDIRECT = os.getenv("GITHUB_OAUTH_REDIRECT", "")
 
 # Admin defaults
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@syrlink.com").lower()

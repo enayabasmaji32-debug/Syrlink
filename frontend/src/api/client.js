@@ -13,14 +13,9 @@ const client = axios.create({
 // Retry configuration with request-level tracking
 const MAX_RETRIES = 2;
 const RETRY_CONFIG = new WeakMap();
-const NON_RETRYABLE_ENDPOINTS = ['/auth/register', '/auth/login', '/auth/verify-otp'];
-
-const getRetryKey = (config) => {
-  return `${config.method}-${config.url}`;
-};
+const NON_RETRYABLE_ENDPOINTS = [];
 
 const shouldRetry = (config) => {
-  // Don't retry auth endpoints (they may have side effects)
   return !NON_RETRYABLE_ENDPOINTS.some((ep) => config.url?.includes(ep));
 };
 
@@ -40,7 +35,7 @@ const logNetworkError = (err) => {
 
 const redirectToLoginIfNeeded = () => {
   if (typeof globalThis !== 'undefined' && globalThis.location) {
-    const allowedPaths = ['/login', '/register', '/verify-otp', '/forgot-password'];
+    const allowedPaths = ['/login'];
     if (!allowedPaths.includes(globalThis.location.pathname)) {
       try {
         globalThis.location.assign('/login');
@@ -52,11 +47,6 @@ const redirectToLoginIfNeeded = () => {
 };
 
 client.interceptors.request.use((config) => {
-  const token = localStorage.getItem('li_token');
-  if (token) {
-    config.headers = config.headers || {};
-    config.headers.Authorization = `Bearer ${token}`;
-  }
   // Initialize retry counter for this specific request
   if (!config.retryCount) {
     config.retryCount = 0;
