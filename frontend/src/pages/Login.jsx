@@ -122,14 +122,10 @@ export default function Login() {
         </div>
 
         <div className="mt-6 text-sm text-gray-600">
-          <p>GitHub OAuth هي طريقة المصادقة الوحيدة المدعومة.</p>
-          <p className="mt-2">
-            إذا كنت بحاجة للمساعدة، راجع الشروط وسياسة الخصوصية وNDA.
-          </p>
-          <p className="mt-2">
-            <a href="/terms" className="text-[#0a66c2] hover:underline" target="_blank" rel="noopener noreferrer">Terms of Service</a> ·
-            <a href="/privacy" className="text-[#0a66c2] hover:underline ml-2" target="_blank" rel="noopener noreferrer">Privacy Policy</a> ·
-            <a href="/nda" className="text-[#0a66c2] hover:underline ml-2" target="_blank" rel="noopener noreferrer">NDA</a>
+          <p>
+            بتسجيل الدخول أنت توافق على <a href="/terms" className="text-[#0a66c2] hover:underline" target="_blank" rel="noopener noreferrer">الشروط</a> و
+            <a href="/privacy" className="text-[#0a66c2] hover:underline mx-1" target="_blank" rel="noopener noreferrer">سياسة الخصوصية</a> و
+            <a href="/nda" className="text-[#0a66c2] hover:underline" target="_blank" rel="noopener noreferrer">اتفاقية عدم الإفشاء (NDA)</a>.
           </p>
         </div>
       </div>
