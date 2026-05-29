@@ -20,8 +20,8 @@ const setCookie = (name, value, options = {}) => {
 };
 
 export default function PrivacyPolicy() {
-  const published = '03/12/47 10:15 م';
-  const updated = '03/12/47 10:15 م';
+  const published = '30 مايو 2026 10:15 م';
+  const updated = '30 مايو 2026 10:15 م';
   const [cookieConsent, setCookieConsent] = useState(false);
   const [showCookieModal, setShowCookieModal] = useState(false);
 
@@ -58,7 +58,7 @@ export default function PrivacyPolicy() {
 
       <div className="prose prose-invert max-w-none leading-relaxed text-right max-w-4xl mx-auto p-6" dir="rtl">
         <h2>سياسة الخصوصية لمنصة SyrLink</h2>
-        <p><strong>آخر تحديث: [تاريخ النشر على الموقع]</strong></p>
+        <p><strong>آخر تحديث: 30 مايو 2026 10:15 م</strong></p>
         <p>تشكل هذه السياسة جزءاً من اتفاق استخدام منصة SyrLink، ويُعدّ إنشاء حساب أو الدخول إلى المنصة أو استخدامها بأي شكل إقراراً منك بأنك قرأت هذه السياسة وفهمتها ووافقت على الالتزام بأحكامها.</p>
 
         <h3>أولاً: الإطار القانوني المنظِّم</h3>

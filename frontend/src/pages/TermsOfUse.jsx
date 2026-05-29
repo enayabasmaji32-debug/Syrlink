@@ -20,8 +20,8 @@ const setCookie = (name, value, options = {}) => {
 };
 
 export default function TermsOfUse() {
-  const published = '03/12/47 10:15 م';
-  const updated = '03/12/47 10:15 م';
+  const published = '30 مايو 2026 10:15 م';
+  const updated = '30 مايو 2026 10:15 م';
   const [cookieConsent, setCookieConsent] = useState(false);
   const [showCookieModal, setShowCookieModal] = useState(false);
 
@@ -58,7 +58,7 @@ export default function TermsOfUse() {
 
       <div className="prose prose-invert max-w-none leading-relaxed text-right max-w-4xl mx-auto p-6" dir="rtl">
         <h2>شروط الاستخدام لمنصة SyrLink</h2>
-        <p><strong>آخر تحديث: 03/12/47 10:15 م</strong></p>
+        <p><strong>آخر تحديث: 30 مايو 2026 10:15 م</strong></p>
 
         <h3>تمهيد</h3>
         <p>مرحباً بك في منصة SyrLink، وهي منصة رقمية مهنية سورية تعمل كشَبكة اجتماعية مهنية للشركات، والباحثين عن عمل، والمستثمرين، وأصحاب المشاريع وغيرهم من الفاعلين في البيئة الاقتصادية والمهنية. تهدف المنصة إلى تسهيل التواصل المهني، ونشر الفرص الوظيفية والاستثمارية، والتعريف بالشركات والمشاريع والخبرات المهنية.</p>

@@ -47,7 +47,7 @@ export default function NDA() {
       <div className="max-w-4xl mx-auto p-6 sm:p-10 text-right" dir="rtl">
         <div className="rounded-lg bg-white shadow-sm border p-5 mb-6">
           <h1 className="text-2xl font-bold">اتفاقية عدم الإفصاح (NDA) - منصة SyrLink</h1>
-          <p className="text-sm text-gray-600 mt-2">آخر تحديث: 03/12/47 10:15 م</p>
+          <p className="text-sm text-gray-600 mt-2">آخر تحديث: 30 مايو 2026 10:15 م</p>
         </div>
 
         <div className="prose prose-invert max-w-none leading-relaxed">
