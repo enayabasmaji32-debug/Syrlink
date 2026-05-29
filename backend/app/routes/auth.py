@@ -63,7 +63,7 @@ async def github_login(request: Request):
         value=state,
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="strict",
+        samesite="lax",
         max_age=300,
         path="/",
     )
@@ -84,7 +84,7 @@ async def google_login(request: Request):
         value=state,
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="strict",
+        samesite="lax",
         max_age=300,
         path="/",
     )
