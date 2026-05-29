@@ -123,9 +123,9 @@ export default function Login() {
 
         <div className="mt-6 text-sm text-gray-600">
           <p>
-            بتسجيل الدخول أنت توافق على <a href="/terms" className="text-[#0a66c2] hover:underline" target="_blank" rel="noopener noreferrer">الشروط</a> و
-            <a href="/privacy" className="text-[#0a66c2] hover:underline mx-1" target="_blank" rel="noopener noreferrer">سياسة الخصوصية</a> و
-            <a href="/nda" className="text-[#0a66c2] hover:underline" target="_blank" rel="noopener noreferrer">اتفاقية عدم الإفشاء (NDA)</a>.
+            بتسجيل الدخول أنت توافق على <a href="/terms" className="text-[#0a66c2] hover:underline">الشروط</a> و
+            <a href="/privacy" className="text-[#0a66c2] hover:underline mx-1">سياسة الخصوصية</a> و
+            <a href="/nda" className="text-[#0a66c2] hover:underline">اتفاقية عدم الإفشاء (NDA)</a>.
           </p>
         </div>
       </div>

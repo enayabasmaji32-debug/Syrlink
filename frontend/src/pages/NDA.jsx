@@ -4,6 +4,11 @@ import { Link } from 'react-router-dom';
 export default function NDA() {
   return (
     <div className="max-w-4xl mx-auto p-6 sm:p-10 text-right" dir="rtl">
+      <div className="mb-4">
+        <Link to="/login" className="text-[#0a66c2] hover:underline inline-flex items-center gap-2">
+          ← العودة إلى تسجيل الدخول
+        </Link>
+      </div>
       <h1 className="text-2xl font-bold mb-4">اتفاقية عدم الإفصاح (NDA) - منصة SyrLink</h1>
 
       <div className="prose prose-invert max-w-none leading-relaxed">

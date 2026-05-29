@@ -7,6 +7,11 @@ export default function TermsOfUse() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 sm:p-10 text-right" dir="rtl">
+      <div className="mb-4">
+        <Link to="/login" className="text-[#0a66c2] hover:underline inline-flex items-center gap-2">
+          ← العودة إلى تسجيل الدخول
+        </Link>
+      </div>
       <div className="mb-6">
         <div className="rounded-lg bg-white shadow-sm border p-5">
           <h1 className="text-2xl font-bold">شروط الاستخدام - منصة SyrLink</h1>
