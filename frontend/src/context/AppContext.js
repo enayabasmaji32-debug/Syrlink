@@ -53,13 +53,12 @@ export function AppProvider({ children }) {
 
   // On mount: try to restore session - NON-BLOCKING
   useEffect(() => {
-    const storedConsent = getCookie('li_cookie_consent') === 'yes';
+    let storedConsent = getCookie('li_cookie_consent') === 'yes';
 
+    // Auto-accept cookies on first visit to allow seamless authentication
     if (!storedConsent) {
-      localStorage.removeItem('li_token');
-      eraseCookie('li_token');
-      setAuthReady(true);
-      return;
+      setCookie('li_cookie_consent', 'yes', { maxAge: 31536000 }); // 1 year
+      storedConsent = true;
     }
 
     authApi.me()
