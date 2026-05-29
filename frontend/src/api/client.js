@@ -35,8 +35,12 @@ const logNetworkError = (err) => {
 
 const redirectToLoginIfNeeded = () => {
   if (typeof globalThis !== 'undefined' && globalThis.location) {
-    const allowedPaths = ['/login'];
-    if (!allowedPaths.includes(globalThis.location.pathname)) {
+    // Public pages that don't require authentication
+    const publicPages = ['/login', '/privacy', '/terms', '/nda'];
+    const currentPath = globalThis.location.pathname;
+    
+    // Don't redirect if already on a public page
+    if (!publicPages.includes(currentPath)) {
       try {
         globalThis.location.assign('/login');
       } catch (redirectError) {
