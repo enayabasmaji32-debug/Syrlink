@@ -1,7 +1,39 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+const getCookie = (name) => {
+  if (typeof document === 'undefined') return '';
+  const regex = new RegExp(`(?:^|; )${name}=([^;]*)`);
+  const match = regex.exec(document.cookie);
+  return match ? decodeURIComponent(match[1]) : '';
+};
+
+const setCookie = (name, value, options = {}) => {
+  if (typeof document === 'undefined') return;
+  const opts = { path: '/', sameSite: 'Lax', ...options };
+  let cookieString = `${name}=${encodeURIComponent(value)}`;
+  if (opts.maxAge) cookieString += `; max-age=${opts.maxAge}`;
+  if (opts.path) cookieString += `; path=${opts.path}`;
+  if (opts.sameSite) cookieString += `; samesite=${opts.sameSite}`;
+  if (opts.secure) cookieString += `; secure`;
+  document.cookie = cookieString;
+};
+
 export default function NDA() {
+  const [cookieConsent, setCookieConsent] = useState(false);
+  const [showCookieModal, setShowCookieModal] = useState(false);
+
+  useEffect(() => {
+    const consent = getCookie('li_cookie_consent') === 'yes';
+    setCookieConsent(consent);
+    setShowCookieModal(!consent);
+  }, []);
+
+  const acceptCookies = () => {
+    setCookie('li_cookie_consent', 'yes', { maxAge: 31536000 });
+    setCookieConsent(true);
+    setShowCookieModal(false);
+  };
   return (
     <div className="max-w-4xl mx-auto p-6 sm:p-10 text-right" dir="rtl">
       <div className="mb-4">
@@ -208,6 +240,38 @@ export default function NDA() {
       <div className="mt-8">
         <Link to="/login" className="text-sm text-[#0a66c2] hover:underline">العودة لتسجيل الدخول</Link>
       </div>
+
+      {!cookieConsent && showCookieModal && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-3xl px-4">
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-4 flex items-center gap-4 text-right">
+            <div className="flex items-center">
+              <input
+                id="cookie-consent-checkbox"
+                type="checkbox"
+                checked={cookieConsent}
+                onChange={(e) => {
+                  if (e.target.checked) acceptCookies();
+                }}
+                className="w-5 h-5 text-[#0a66c2] rounded focus:ring-0"
+              />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm text-gray-700 dark:text-gray-200 leading-tight">
+                نستخدم الكوكيز لحفظ الجلسة وتأمين تسجيل الدخول وتخزين تفضيلاتك. للموافقة على الدخول، ضع علامة (✓) بالمربع.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={acceptCookies}
+                className="px-3 py-1.5 rounded-full bg-[#0a66c2] text-white text-sm"
+              >
+                أوافق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
