@@ -80,10 +80,20 @@ async def github_login(request: Request):
 @router.get("/google/login")
 async def google_login(request: Request):
     if not GOOGLE_CLIENT_ID or not GOOGLE_OAUTH_REDIRECT:
+        log.error("Google OAuth login attempted but configuration is missing.", extra={
+            "client_id": bool(GOOGLE_CLIENT_ID),
+            "redirect_uri": bool(GOOGLE_OAUTH_REDIRECT),
+        })
         raise HTTPException(status_code=500, detail="Google OAuth is not configured")
 
     state = secrets.token_urlsafe(16)
     auth_url = _build_google_auth_url(state)
+    log.info("Google login redirecting user to provider", extra={
+        "provider": "google",
+        "redirect_uri": GOOGLE_OAUTH_REDIRECT,
+        "state": state,
+        "auth_url": auth_url,
+    })
 
     response = RedirectResponse(auth_url)
     response.set_cookie(
@@ -98,7 +108,7 @@ async def google_login(request: Request):
     return response
 
 
-@router.get("/github/callback")
+@router.get("/google/callback")
 async def github_callback(request: Request, code: str | None = None, state: str | None = None):
     query_params = dict(request.query_params)
     cookie_state = request.cookies.get("oauth_state")
@@ -263,13 +273,39 @@ async def github_callback(request: Request, code: str | None = None, state: str 
 
 @router.get("/google/callback")
 async def google_callback(request: Request, code: str | None = None, state: str | None = None):
+    query_params = dict(request.query_params)
+    cookie_state = request.cookies.get("oauth_state")
+    log.info("Google callback received", extra={
+        "provider": "google",
+        "url": str(request.url),
+        "query_params": query_params,
+        "cookie_state": cookie_state,
+    })
+
+    if query_params.get("error"):
+        log.error("Google returned an error callback", extra={
+            "error": query_params.get("error"),
+            "error_description": query_params.get("error_description"),
+        })
+        raise HTTPException(status_code=400, detail=f"Google OAuth error: {query_params.get('error')}")
+
     if not code:
+        log.error("Google callback missing code", extra={"query_params": query_params})
         raise HTTPException(status_code=400, detail="Missing Google authorization code")
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET or not GOOGLE_OAUTH_REDIRECT:
+        log.error("Google OAuth callback attempted but configuration is missing", extra={
+            "client_id": bool(GOOGLE_CLIENT_ID),
+            "client_secret": bool(GOOGLE_CLIENT_SECRET),
+            "redirect_uri": bool(GOOGLE_OAUTH_REDIRECT),
+        })
         raise HTTPException(status_code=500, detail="Google OAuth is not configured")
 
-    cookie_state = request.cookies.get("oauth_state")
     if not state or not cookie_state or state != cookie_state:
+        log.error("Google callback state mismatch", extra={
+            "query_state": state,
+            "cookie_state": cookie_state,
+            "query_params": query_params,
+        })
         raise HTTPException(status_code=400, detail="Invalid OAuth state")
 
     async with httpx.AsyncClient(timeout=20) as client:
@@ -347,7 +383,7 @@ async def google_callback(request: Request, code: str | None = None, state: str 
         value=token,
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="strict",
+        samesite="lax",
         max_age=JWT_COOKIE_MAX_AGE,
         path="/",
     )

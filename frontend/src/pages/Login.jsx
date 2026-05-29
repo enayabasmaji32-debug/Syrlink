@@ -53,12 +53,24 @@ export default function Login() {
     e.preventDefault();
     setErr('');
     if (!cookieConsent) {
-      setErr('ظٹط±ط¬ظ‰ ط§ظ„ظ…ظˆط§ظپظ‚ط© ط¹ظ„ظ‰ ط§ظ„ظƒظˆظƒظٹط² ظ„ظ„ط¯ط®ظˆظ„');
+      setErr('يرجى الموافقة على الكوكيز للدخول');
       setShowCookieModal(true);
       return;
     }
     setLoading(true);
     window.location.assign(authApi.githubLoginUrl());
+  };
+
+  const handleGoogleLogin = (e) => {
+    e.preventDefault();
+    setErr('');
+    if (!cookieConsent) {
+      setErr('يرجى الموافقة على الكوكيز للدخول');
+      setShowCookieModal(true);
+      return;
+    }
+    setLoading(true);
+    window.location.assign(authApi.googleLoginUrl());
   };
 
   return (
@@ -69,9 +81,9 @@ export default function Login() {
       </Link>
 
       <div className="li-card w-full max-w-md p-7 shadow-sm">
-        <h1 className="text-2xl font-bold mb-1">Sign in with GitHub</h1>
+        <h1 className="text-2xl font-bold mb-1">Sign in with GitHub or Google</h1>
         <p className="text-sm text-gray-600 mb-5">
-          Use GitHub to authenticate and access SyrLink securely.
+          Use GitHub or Google to authenticate and access SyrLink securely.
         </p>
 
         {err && <p className="text-sm text-red-600 mb-3" data-testid="login-error">{err}</p>}
@@ -90,6 +102,22 @@ export default function Login() {
               </svg>
             </span>
             <span>{loading ? 'Redirecting…' : 'GitHub'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={loading || !cookieConsent}
+            className="w-full inline-flex items-center justify-center gap-3 border border-gray-200 bg-white hover:bg-gray-50 disabled:bg-gray-100 text-gray-900 font-semibold rounded-2xl py-3 px-5 text-sm shadow-[0_24px_44px_-20px_rgba(0,0,0,0.16)] transition duration-200 ease-out transform hover:-translate-y-0.5 disabled:translate-y-0"
+          >
+            <span className="inline-flex items-center justify-center w-10 h-10 bg-white rounded-full shadow-sm">
+              <svg viewBox="0 0 533.5 544.3" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5">
+                <path d="M533.5 278.4c0-17.4-1.5-34.1-4.3-50.4H272v95.4h146.9c-6.4 34.5-25.7 63.7-54.7 83.3v69.2h88.4c51.5-47.5 81.9-117.3 81.9-197.5z" fill="#4285f4"/>
+                <path d="M272 544.3c73.7 0 135.7-24.5 181-66.6l-88.4-69.2c-24.5 16.4-56 26-92.6 26-71 0-131.3-47.9-152.9-112.1H32.8v70.4C77.5 487.9 168.4 544.3 272 544.3z" fill="#34a853"/>
+                <path d="M88.3 318.9c-11.4-34.1-11.4-70.5 0-104.6V144.1H32.8c-37.2 74.5-37.2 162.8 0 237.3l55.5-62.5z" fill="#fbbc04"/>
+                <path d="M272 107.7c39.6-.6 78.4 14.3 108.2 41.4l81.1-81.1C397.1 24.3 337.9-.5 272 0 168.4 0 77.5 56.4 32.8 144.1l55.5 62.5C140.7 150.8 202.1 107.9 272 107.7z" fill="#ea4335"/>
+              </svg>
+            </span>
+            <span>{loading ? 'Redirecting…' : 'Google'}</span>
           </button>
         </div>
 
