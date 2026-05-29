@@ -52,10 +52,17 @@ def _build_google_auth_url(state: str) -> str:
 @router.get("/github/login")
 async def github_login(request: Request):
     if not GITHUB_CLIENT_ID or not GITHUB_OAUTH_REDIRECT:
+        log.error("GitHub OAuth login attempted but configuration is missing. client_id=%s redirect_uri=%s", bool(GITHUB_CLIENT_ID), bool(GITHUB_OAUTH_REDIRECT))
         raise HTTPException(status_code=500, detail="GitHub OAuth is not configured")
 
     state = secrets.token_urlsafe(16)
     auth_url = _build_github_auth_url(state)
+    log.info("GitHub login redirecting user to provider", extra={
+        "provider": "github",
+        "redirect_uri": GITHUB_OAUTH_REDIRECT,
+        "state": state,
+        "auth_url": auth_url,
+    })
 
     response = RedirectResponse(auth_url)
     response.set_cookie(
@@ -93,58 +100,113 @@ async def google_login(request: Request):
 
 @router.get("/github/callback")
 async def github_callback(request: Request, code: str | None = None, state: str | None = None):
+    query_params = dict(request.query_params)
+    cookie_state = request.cookies.get("oauth_state")
+    log.info("GitHub callback received", extra={
+        "provider": "github",
+        "url": str(request.url),
+        "query_params": query_params,
+        "cookie_state": cookie_state,
+    })
+
+    if query_params.get("error"):
+        log.error("GitHub returned an error callback", extra={
+            "error": query_params.get("error"),
+            "error_description": query_params.get("error_description"),
+        })
+        raise HTTPException(status_code=400, detail=f"GitHub OAuth error: {query_params.get('error')}")
+
     if not code:
+        log.error("GitHub callback missing code", extra={"query_params": query_params})
         raise HTTPException(status_code=400, detail="Missing GitHub authorization code")
     if not GITHUB_CLIENT_ID or not GITHUB_CLIENT_SECRET or not GITHUB_OAUTH_REDIRECT:
+        log.error("GitHub OAuth callback attempted but configuration is missing", extra={
+            "client_id": bool(GITHUB_CLIENT_ID),
+            "client_secret": bool(GITHUB_CLIENT_SECRET),
+            "redirect_uri": bool(GITHUB_OAUTH_REDIRECT),
+        })
         raise HTTPException(status_code=500, detail="GitHub OAuth is not configured")
 
-    cookie_state = request.cookies.get("oauth_state")
     if not state or not cookie_state or state != cookie_state:
+        log.error("GitHub callback state mismatch", extra={
+            "query_state": state,
+            "cookie_state": cookie_state,
+            "query_params": query_params,
+        })
         raise HTTPException(status_code=400, detail="Invalid OAuth state")
 
-    async with httpx.AsyncClient(timeout=20) as client:
-        token_resp = await client.post(
-            "https://github.com/login/oauth/access_token",
-            data={
-                "client_id": GITHUB_CLIENT_ID,
-                "client_secret": GITHUB_CLIENT_SECRET,
-                "code": code,
-                "redirect_uri": GITHUB_OAUTH_REDIRECT,
-                "state": state,
-            },
-            headers={"Accept": "application/json"},
-        )
-        if token_resp.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to exchange GitHub code")
-        token_data = token_resp.json()
-        access_token = token_data.get("access_token")
-        if not access_token:
-            raise HTTPException(status_code=400, detail="GitHub token exchange returned no access token")
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            token_resp = await client.post(
+                "https://github.com/login/oauth/access_token",
+                data={
+                    "client_id": GITHUB_CLIENT_ID,
+                    "client_secret": GITHUB_CLIENT_SECRET,
+                    "code": code,
+                    "redirect_uri": GITHUB_OAUTH_REDIRECT,
+                    "state": state,
+                },
+                headers={"Accept": "application/json"},
+            )
+            token_data = token_resp.json()
+            log.info("GitHub token exchange completed", extra={
+                "status_code": token_resp.status_code,
+                "token_data": {
+                    k: ("***" if k == "access_token" else v) for k, v in token_data.items()
+                },
+            })
 
-        user_resp = await client.get(
-            "https://api.github.com/user",
-            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/vnd.github+json"},
-        )
-        if user_resp.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to fetch GitHub user profile")
-        github_user = user_resp.json()
+            if token_resp.status_code != 200:
+                log.error("GitHub token exchange failed", extra={"status_code": token_resp.status_code, "body": token_data})
+                raise HTTPException(status_code=400, detail="Failed to exchange GitHub code")
+            access_token = token_data.get("access_token")
+            if not access_token:
+                log.error("GitHub token exchange returned no access token", extra={"body": token_data})
+                raise HTTPException(status_code=400, detail="GitHub token exchange returned no access token")
 
-        email = github_user.get("email")
-        if not email:
-            emails_resp = await client.get(
-                "https://api.github.com/user/emails",
+            user_resp = await client.get(
+                "https://api.github.com/user",
                 headers={"Authorization": f"Bearer {access_token}", "Accept": "application/vnd.github+json"},
             )
-            if emails_resp.status_code == 200:
+            github_user = user_resp.json()
+            log.info("GitHub user profile fetched", extra={
+                "status_code": user_resp.status_code,
+                "user_id": github_user.get("id"),
+                "login": github_user.get("login"),
+                "email": github_user.get("email"),
+            })
+
+            if user_resp.status_code != 200:
+                log.error("Failed to fetch GitHub user profile", extra={"status_code": user_resp.status_code, "body": github_user})
+                raise HTTPException(status_code=400, detail="Failed to fetch GitHub user profile")
+
+            email = github_user.get("email")
+            if not email:
+                emails_resp = await client.get(
+                    "https://api.github.com/user/emails",
+                    headers={"Authorization": f"Bearer {access_token}", "Accept": "application/vnd.github+json"},
+                )
                 emails = emails_resp.json()
-                primary = next((item for item in emails if item.get("primary") and item.get("verified")), None)
-                if primary:
-                    email = primary.get("email")
-                else:
-                    verified = next((item for item in emails if item.get("verified")), None)
-                    email = verified.get("email") if verified else None
+                log.info("GitHub email list fetched", extra={
+                    "status_code": emails_resp.status_code,
+                    "emails_count": len(emails) if isinstance(emails, list) else None,
+                })
+                if emails_resp.status_code == 200:
+                    primary = next((item for item in emails if item.get("primary") and item.get("verified")), None)
+                    if primary:
+                        email = primary.get("email")
+                    else:
+                        verified = next((item for item in emails if item.get("verified")), None)
+                        email = verified.get("email") if verified else None
+
+    except HTTPException:
+        raise
+    except Exception:
+        log.exception("Unexpected exception during GitHub callback")
+        raise HTTPException(status_code=500, detail="GitHub OAuth internal error")
 
     if not email:
+        log.error("Unable to determine verified GitHub email", extra={"github_user": github_user})
         raise HTTPException(status_code=400, detail="Unable to determine a verified GitHub email address")
 
     email = email.lower()
@@ -190,11 +252,12 @@ async def github_callback(request: Request, code: str | None = None, state: str 
         value=token,
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="strict",
+        samesite="lax",
         max_age=JWT_COOKIE_MAX_AGE,
         path="/",
     )
     response.delete_cookie(key="oauth_state", path="/")
+    log.info("GitHub OAuth completed successfully", extra={"user_id": user["id"], "email": email, "redirect_target": redirect_target})
     return response
 
 

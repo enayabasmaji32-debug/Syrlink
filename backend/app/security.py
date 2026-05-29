@@ -60,7 +60,15 @@ async def get_current_user(
     cookie_token = request.cookies.get(JWT_COOKIE_NAME) if JWT_COOKIE_NAME in request.cookies else None
     token = bearer_token or cookie_token
 
+    log.info("Authenticating request", extra={
+        "path": request.url.path,
+        "has_bearer": bool(bearer_token),
+        "has_cookie": bool(cookie_token),
+        "cookie_names": list(request.cookies.keys()),
+    })
+
     if not token:
+        log.warning("Authentication failed: no token present", extra={"cookie_names": list(request.cookies.keys())})
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     try:

@@ -61,18 +61,6 @@ export default function Login() {
     window.location.assign(authApi.githubLoginUrl());
   };
 
-  const handleGoogleLogin = (e) => {
-    e.preventDefault();
-    setErr('');
-    if (!cookieConsent) {
-      setErr('ظٹط±ط¬ظ‰ ط§ظ„ظ…ظˆط§ظپظ‚ط© ط¹ظ„ظ‰ ط§ظ„ظƒظˆظƒظٹط² ظ„ظ„ط¯ط®ظˆظ„');
-      setShowCookieModal(true);
-      return;
-    }
-    setLoading(true);
-    window.location.assign(authApi.googleLoginUrl());
-  };
-
   return (
     <div className="min-h-screen flex flex-col items-center pt-10 px-4 bg-[#f4f2ee]">
       <Link to="/" className="flex items-center gap-3 mb-8" data-testid="login-logo">
@@ -81,9 +69,9 @@ export default function Login() {
       </Link>
 
       <div className="li-card w-full max-w-md p-7 shadow-sm">
-        <h1 className="text-2xl font-bold mb-1">Sign in with GitHub or Google</h1>
+        <h1 className="text-2xl font-bold mb-1">Sign in with GitHub</h1>
         <p className="text-sm text-gray-600 mb-5">
-          Use GitHub or Google to authenticate and access SyrLink securely.
+          Use GitHub to authenticate and access SyrLink securely.
         </p>
 
         {err && <p className="text-sm text-red-600 mb-3" data-testid="login-error">{err}</p>}
@@ -103,29 +91,17 @@ export default function Login() {
             </span>
             <span>{loading ? 'Redirecting…' : 'GitHub'}</span>
           </button>
-
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            disabled={loading || !cookieConsent}
-            className="w-full inline-flex items-center justify-center gap-3 border border-gray-200 bg-white hover:bg-gray-50 disabled:bg-gray-100 text-gray-900 font-semibold rounded-2xl py-3 px-5 text-sm shadow-[0_24px_44px_-20px_rgba(0,0,0,0.16)] transition duration-200 ease-out transform hover:-translate-y-0.5 disabled:translate-y-0"
-          >
-            <span className="inline-flex items-center justify-center w-10 h-10 bg-white rounded-full shadow-sm">
-              <svg viewBox="0 0 533.5 544.3" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5">
-                <path d="M533.5 278.4c0-17.4-1.5-34.1-4.3-50.4H272v95.4h146.9c-6.4 34.5-25.7 63.7-54.7 83.3v69.2h88.4c51.5-47.5 81.9-117.3 81.9-197.5z" fill="#4285f4"/>
-                <path d="M272 544.3c73.7 0 135.7-24.5 181-66.6l-88.4-69.2c-24.5 16.4-56 26-92.6 26-71 0-131.3-47.9-152.9-112.1H32.8v70.4C77.5 487.9 168.4 544.3 272 544.3z" fill="#34a853"/>
-                <path d="M119.1 323.8c-11-32.8-11-68.2 0-101l-86-70.4c-37.6 73.6-37.6 161.4 0 235l86-63.6z" fill="#fbbc04"/>
-                <path d="M272 107.7c39.8 0 75.6 13.7 103.7 40.5l77.7-77.7C407.6 23.3 347.5 0 272 0 168.4 0 77.5 56.4 32.8 150.5l86 70.4C140.7 155.6 201 107.7 272 107.7z" fill="#ea4335"/>
-              </svg>
-            </span>
-            <span>{loading ? 'Redirecting…' : 'Google'}</span>
-          </button>
         </div>
 
         <div className="mt-6 text-sm text-gray-600">
-          <p>GitHub و Google OAuth هما طرق المصادقة الوحيدة المدعومة.</p>
+          <p>GitHub OAuth هي طريقة المصادقة الوحيدة المدعومة.</p>
           <p className="mt-2">
-            If you need help, contact the team or review the terms and privacy policy.
+            إذا كنت بحاجة للمساعدة، راجع الشروط وسياسة الخصوصية وNDA.
+          </p>
+          <p className="mt-2">
+            <a href="/terms" className="text-[#0a66c2] hover:underline" target="_blank" rel="noopener noreferrer">Terms of Service</a> ·
+            <a href="/privacy" className="text-[#0a66c2] hover:underline ml-2" target="_blank" rel="noopener noreferrer">Privacy Policy</a> ·
+            <a href="/nda" className="text-[#0a66c2] hover:underline ml-2" target="_blank" rel="noopener noreferrer">NDA</a>
           </p>
         </div>
       </div>
