@@ -252,10 +252,9 @@ const PostCardComponent = ({ post }) => {
           className="relative flex-1"
           onMouseEnter={() => setShowReactions(true)}
           onMouseLeave={() => setShowReactions(false)}
-          onClick={() => setShowReactions(!showReactions)}
         >
           <button
-            onClick={onLike}
+            onClick={() => setShowReactions(!showReactions)}
             className={`w-full flex items-center justify-center gap-2 py-2 rounded text-sm font-semibold hover:bg-gray-100 ${
               post.liked ? 'text-[#0a66c2]' : 'text-gray-600'
             }`}
@@ -269,7 +268,10 @@ const PostCardComponent = ({ post }) => {
               {REACTIONS.map((r) => (
                 <button
                   key={r.key}
-                  onClick={() => onReaction(r.key)}
+                  onClick={() => {
+                    onReaction(r.key);
+                    setShowReactions(false);
+                  }}
                   className={`p-2 rounded-full hover:scale-125 transition-transform ${r.color}`}
                   title={r.label}
                 >
