@@ -233,7 +233,7 @@ async def github_callback(request: Request, code: str | None = None, state: str 
             "headline": "",
             "location": github_user.get("location", ""),
             "about": "",
-            "verified": True,
+            "verified": False,
             "email_verified": True,
             "oauth_provider": "github",
             "experience": [],
@@ -248,7 +248,7 @@ async def github_callback(request: Request, code: str | None = None, state: str 
     else:
         await db.users.update_one(
             {"id": user["id"]},
-            {"$set": {"last_seen": now_iso(), "email_verified": True, "verified": True}},
+            {"$set": {"last_seen": now_iso(), "email_verified": True}},
         )
 
     token = create_token(user["id"], email)
@@ -354,7 +354,7 @@ async def google_callback(request: Request, code: str | None = None, state: str 
             "headline": "",
             "location": google_user.get("locale", ""),
             "about": "",
-            "verified": True,
+            "verified": False,
             "email_verified": True,
             "oauth_provider": "google",
             "experience": [],
@@ -369,7 +369,7 @@ async def google_callback(request: Request, code: str | None = None, state: str 
     else:
         await db.users.update_one(
             {"id": user["id"]},
-            {"$set": {"last_seen": now_iso(), "email_verified": True, "verified": True}},
+            {"$set": {"last_seen": now_iso(), "email_verified": True}},
         )
 
     token = create_token(user["id"], email)
