@@ -17,6 +17,7 @@ import {
 import { useApp } from '../context/AppContext';
 import CommentBox from './CommentBox';
 import ReportModal from './ReportModal';
+import { postsApi } from '../api';
 
 function nFmt(n) {
   if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
@@ -43,7 +44,9 @@ const PostCardComponent = ({ post }) => {
   const [editOpen, setEditOpen] = useState(false);
   const [editContent, setEditContent] = useState(post.content || '');
   const [savingEdit, setSavingEdit] = useState(false);
-  const [replyingTo, setReplyingTo] = useState(null); // Comment ID we're replying to
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [showShare, setShowShare] = useState(false);
+  const [selectedRecipient, setSelectedRecipient] = useState(null);
   const comments = commentsByPost[post.id] || [];
 
   const onLike = () => {
@@ -83,6 +86,15 @@ const PostCardComponent = ({ post }) => {
   const onQuoteRepost = async () => {
     if (!quoteText.trim()) return;
     try { await repostPost(post.id, quoteText.trim()); setQuoteOpen(false); setQuoteText(''); } catch (e) {}
+  };
+
+  const toggleCommentLike = async (postId, parentCommentId, commentId) => {
+    try {
+      await postsApi.likeComment(postId, commentId);
+      loadComments(postId).catch((e) => console.warn('Failed loading comments after like', e));
+    } catch (e) {
+      console.warn('Failed to like comment', e);
+    }
   };
 
   const isAuthor = user?.id === post.author?.id;
@@ -240,6 +252,7 @@ const PostCardComponent = ({ post }) => {
           className="relative flex-1"
           onMouseEnter={() => setShowReactions(true)}
           onMouseLeave={() => setShowReactions(false)}
+          onClick={() => setShowReactions(!showReactions)}
         >
           <button
             onClick={onLike}
@@ -277,13 +290,13 @@ const PostCardComponent = ({ post }) => {
           <Repeat2 className="w-5 h-5" />
           Repost
           {showRepostMenu && (
-            <div className="absolute right-0 bottom-12 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-20 w-56" onMouseLeave={() => setShowRepostMenu(false)} onClick={(e) => e.stopPropagation()}>
+            <div className="absolute right-0 bottom-12 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-20 w-56" onClick={(e) => e.stopPropagation()}>
               <div onClick={onSimpleRepost} data-testid={`repost-simple-${post.id}`} className="text-left text-sm hover:bg-gray-100 rounded px-3 py-2 cursor-pointer">Repost</div>
               <div onClick={() => { setShowRepostMenu(false); setQuoteOpen(true); }} data-testid={`repost-quote-${post.id}`} className="text-left text-sm hover:bg-gray-100 rounded px-3 py-2 cursor-pointer">Repost with your thoughts</div>
             </div>
           )}
         </button>
-        <button className="flex-1 flex items-center justify-center gap-2 py-2 rounded text-sm font-semibold text-gray-600 hover:bg-gray-100">
+        <button onClick={() => setShowShare(!showShare)} className="flex-1 flex items-center justify-center gap-2 py-2 rounded text-sm font-semibold text-gray-600 hover:bg-gray-100">
           <Send className="w-5 h-5" />
           Send
         </button>
@@ -310,7 +323,7 @@ const PostCardComponent = ({ post }) => {
                     <p className="text-sm mt-1">{c.text}</p>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-600 mt-1 px-2">
-                    <button className="font-semibold hover:underline">Like</button>
+                    <button onClick={() => toggleCommentLike(post.id, c.id, c.id)} className="font-semibold hover:underline">Like</button>
                     <button onClick={() => setReplyingTo(c.id)} className="font-semibold hover:underline">Reply</button>
                     {c.likes > 0 && <span>· {c.likes} likes</span>}
                   </div>
@@ -330,7 +343,7 @@ const PostCardComponent = ({ post }) => {
                       <p className="text-xs mt-0.5">{reply.text}</p>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-600 mt-0.5 px-1">
-                      <button className="font-semibold hover:underline text-xs">Like</button>
+                      <button onClick={() => toggleCommentLike(post.id, c.id, reply.id)} className="font-semibold hover:underline text-xs">Like</button>
                       <button onClick={() => setReplyingTo(c.id)} className="font-semibold hover:underline text-xs">Reply</button>
                       {reply.likes > 0 && <span>· {reply.likes}</span>}
                     </div>

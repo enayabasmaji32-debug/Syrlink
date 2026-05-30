@@ -40,6 +40,7 @@ export const postsApi = {
   react: (id, reactionType = 'like') => c.post(`/posts/${id}/reaction`, { reaction_type: reactionType }).then((r) => r.data),
   comments: (id) => c.get(`/posts/${id}/comments`).then((r) => r.data),
   addComment: (id, text, parentCommentId = null) => c.post(`/posts/${id}/comments`, { text, parent_comment_id: parentCommentId }).then((r) => r.data),
+  likeComment: (postId, commentId) => c.post(`/posts/${postId}/comments/${commentId}/like`).then((r) => r.data),
 };
 
 export const connectionsApi = {

@@ -429,6 +429,33 @@ async def add_comment(post_id: str, data: CommentIn, current=Depends(get_current
     }
 
 
+@router.post("/{post_id}/comments/{comment_id}/like")
+async def like_comment(post_id: str, comment_id: str, current=Depends(get_current_user)):
+    """Toggle like on a comment."""
+    comment = await db.comments.find_one({"id": comment_id, "post_id": post_id})
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    
+    existing_like = await db.comment_likes.find_one({"comment_id": comment_id, "user_id": current["id"]})
+    if existing_like:
+        await db.comment_likes.delete_one({"_id": existing_like["_id"]})
+        await db.comments.update_one({"id": comment_id}, {"$inc": {"likes_count": -1}})
+        liked = False
+        new_count = comment.get("likes_count", 0) - 1
+    else:
+        await db.comment_likes.insert_one({
+            "id": uid(),
+            "comment_id": comment_id,
+            "user_id": current["id"],
+            "created_at": now_iso(),
+        })
+        await db.comments.update_one({"id": comment_id}, {"$inc": {"likes_count": 1}})
+        liked = True
+        new_count = comment.get("likes_count", 0) + 1
+    
+    return {"id": comment_id, "liked": liked, "count": new_count}
+
+
 @router.post("/{post_id}/repost")
 async def repost(post_id: str, data: RepostIn, current=Depends(get_current_user)):
     """Repost or quote a post."""
