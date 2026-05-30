@@ -65,8 +65,9 @@ async def github_login(request: Request):
     })
 
     response = RedirectResponse(auth_url)
+    # Use provider-specific cookie to avoid mixup with Google
     response.set_cookie(
-        key="oauth_state",
+        key="oauth_state_github",
         value=state,
         httponly=True,
         secure=COOKIE_SECURE,
@@ -96,8 +97,9 @@ async def google_login(request: Request):
     })
 
     response = RedirectResponse(auth_url)
+    # Use provider-specific cookie to avoid mixup with GitHub
     response.set_cookie(
-        key="oauth_state",
+        key="oauth_state_google",
         value=state,
         httponly=True,
         secure=COOKIE_SECURE,
@@ -111,7 +113,8 @@ async def google_login(request: Request):
 @router.get("/github/callback")
 async def github_callback(request: Request, code: str | None = None, state: str | None = None):
     query_params = dict(request.query_params)
-    cookie_state = request.cookies.get("oauth_state")
+    # Use provider-specific cookie for GitHub
+    cookie_state = request.cookies.get("oauth_state_github")
     log.info("GitHub callback received", extra={
         "provider": "github",
         "url": str(request.url),
@@ -266,7 +269,7 @@ async def github_callback(request: Request, code: str | None = None, state: str 
         max_age=JWT_COOKIE_MAX_AGE,
         path="/",
     )
-    response.delete_cookie(key="oauth_state", path="/")
+    response.delete_cookie(key="oauth_state_github", path="/")
     log.info("GitHub OAuth completed successfully", extra={"user_id": user["id"], "email": email, "redirect_target": redirect_target})
     return response
 
@@ -274,7 +277,8 @@ async def github_callback(request: Request, code: str | None = None, state: str 
 @router.get("/google/callback")
 async def google_callback(request: Request, code: str | None = None, state: str | None = None):
     query_params = dict(request.query_params)
-    cookie_state = request.cookies.get("oauth_state")
+    # Use provider-specific cookie for Google
+    cookie_state = request.cookies.get("oauth_state_google")
     log.info("Google callback received", extra={
         "provider": "google",
         "url": str(request.url),
@@ -387,7 +391,7 @@ async def google_callback(request: Request, code: str | None = None, state: str 
         max_age=JWT_COOKIE_MAX_AGE,
         path="/",
     )
-    response.delete_cookie(key="oauth_state", path="/")
+    response.delete_cookie(key="oauth_state_google", path="/")
     return response
 
 
@@ -403,5 +407,7 @@ async def logout() -> JSONResponse:
         key=JWT_COOKIE_NAME,
         path="/",
     )
-    response.delete_cookie(key="oauth_state", path="/")
+    # Clear both provider-specific state cookies
+    response.delete_cookie(key="oauth_state_github", path="/")
+    response.delete_cookie(key="oauth_state_google", path="/")
     return response
