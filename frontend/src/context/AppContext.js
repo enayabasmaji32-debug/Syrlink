@@ -258,31 +258,38 @@ export function AppProvider({ children }) {
   };
 
   const toggleLike = async (postId, reactionType = 'like') => {
-    // optimistic update
-    setPosts((all) => all.map((p) => p.id === postId
-      ? { ...p, liked: !p.liked, likes: p.likes + (p.liked ? -1 : 1) }
-      : p));
+    // Get current state to determine optimistic update
+    const currentPost = posts.find(p => p.id === postId);
+    const currentReaction = currentPost?.reaction;
+    const isToggling = currentReaction === reactionType; // Same reaction = remove
+    
     try {
-      // Use new react endpoint if reaction type is specified
-        if (reactionType && reactionType !== 'like') {
-          const res = await postsApi.react(postId, reactionType);
-          const newLikes = res.count ?? res.likes_count ?? res.count ?? undefined;
-          setPosts((all) => all.map((p) => p.id === postId
-            ? { ...p, liked: res.reaction !== null, likes: typeof newLikes === 'number' ? newLikes : p.likes, reaction: res.reaction }
-            : p));
-        } else {
-          // Fall back to like endpoint for default like
-          const res = await postsApi.like(postId);
-          const newLikes = res.count ?? res.likes_count ?? res.count ?? undefined;
-          setPosts((all) => all.map((p) => p.id === postId
-            ? { ...p, liked: res.liked, likes: typeof newLikes === 'number' ? newLikes : p.likes, reaction: res.liked ? 'like' : null }
-            : p));
-        }
+      if (reactionType && reactionType !== 'like') {
+        // Switching to/from reaction type
+        setPosts((all) => all.map((p) => p.id === postId
+          ? { ...p, liked: !isToggling, reaction: isToggling ? null : reactionType, likes: p.likes + (isToggling ? -1 : currentReaction ? 0 : 1) }
+          : p));
+        
+        const res = await postsApi.react(postId, reactionType);
+        const newLikes = res.count ?? res.likes_count ?? undefined;
+        setPosts((all) => all.map((p) => p.id === postId
+          ? { ...p, liked: res.reaction !== null, likes: typeof newLikes === 'number' ? newLikes : p.likes, reaction: res.reaction }
+          : p));
+      } else {
+        // Default like
+        setPosts((all) => all.map((p) => p.id === postId
+          ? { ...p, liked: !p.liked, likes: p.likes + (p.liked ? -1 : 1), reaction: p.liked ? null : 'like' }
+          : p));
+        
+        const res = await postsApi.like(postId);
+        const newLikes = res.count ?? res.likes_count ?? undefined;
+        setPosts((all) => all.map((p) => p.id === postId
+          ? { ...p, liked: res.liked, likes: typeof newLikes === 'number' ? newLikes : p.likes, reaction: res.liked ? 'like' : null }
+          : p));
+      }
     } catch (e) {
       // revert on error
-      setPosts((all) => all.map((p) => p.id === postId
-        ? { ...p, liked: !p.liked, likes: p.likes + (p.liked ? -1 : 1) }
-        : p));
+      setPosts((all) => all.map((p) => p.id === postId ? currentPost : p));
       console.error('[toggleLike] Error:', e);
     }
   };

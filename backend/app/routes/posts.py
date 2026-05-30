@@ -287,16 +287,19 @@ async def add_reaction(post_id: str, data: ReactionIn, current=Depends(get_curre
     # Check if user already has a reaction on this post
     existing = await db.post_likes.find_one({"post_id": post_id, "user_id": current["id"]})
     
+    current_likes = post.get("likes_count", 0)
+    
     if existing:
         # Update existing reaction
         old_reaction = existing.get("reaction", "like")
         if old_reaction == reaction_type:
             # Same reaction clicked again - remove it
             await db.post_likes.delete_one({"_id": existing["_id"]})
+            await db.posts.update_one({"id": post_id}, {"$inc": {"likes_count": -1}})
             log.debug(f"[reaction] Removed {reaction_type} on post {post_id}")
-            return {"id": post_id, "reaction": None, "count": post.get("likes_count", 0) - 1}
+            return {"id": post_id, "reaction": None, "count": current_likes - 1}
         else:
-            # Different reaction - update it
+            # Different reaction - update it (count stays same)
             await db.post_likes.update_one(
                 {"_id": existing["_id"]},
                 {"$set": {"reaction": reaction_type, "updated_at": now_iso()}}
@@ -312,6 +315,7 @@ async def add_reaction(post_id: str, data: ReactionIn, current=Depends(get_curre
             "created_at": now_iso(),
         })
         await db.posts.update_one({"id": post_id}, {"$inc": {"likes_count": 1}})
+        current_likes += 1
         
         # Notify post author on any reaction
         if post["author_id"] != current["id"]:
@@ -334,7 +338,7 @@ async def add_reaction(post_id: str, data: ReactionIn, current=Depends(get_curre
     return {
         "id": post_id,
         "reaction": reaction_type,
-        "count": post.get("likes_count", 0),
+        "count": current_likes,
     }
 
 
