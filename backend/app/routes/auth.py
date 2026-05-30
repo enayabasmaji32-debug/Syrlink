@@ -108,7 +108,7 @@ async def google_login(request: Request):
     return response
 
 
-@router.get("/google/callback")
+@router.get("/github/callback")
 async def github_callback(request: Request, code: str | None = None, state: str | None = None):
     query_params = dict(request.query_params)
     cookie_state = request.cookies.get("oauth_state")
