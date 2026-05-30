@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import LeftSidebar from '../components/LeftSidebar';
 import RightSidebar from '../components/RightSidebar';
 import CreatePost from '../components/CreatePost';
@@ -10,6 +10,15 @@ import { Filter } from 'lucide-react';
 
 export default function Feed() {
   const { posts } = useApp();
+
+  useEffect(() => {
+    const hash = window.location.hash?.slice(1);
+    if (!hash) return;
+    const el = document.getElementById(hash);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [posts]);
   
   if (!posts || !Array.isArray(posts)) {
     return (

@@ -2,6 +2,8 @@
 from typing import Annotated, Literal
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 import time as _t
+import datetime
+import random
 
 from app.models import VerificationRequestIn, ReportIn, CompanyRequestDecisionIn, SuspendUserIn, ReportResolveIn
 from app.security import get_current_user, require_admin
@@ -10,6 +12,122 @@ from app.database import db
 from app.config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 import cloudinary.utils
 import os
+
+NEWS_CACHE = None
+NEWS_CACHE_UPDATED = 0
+
+CATEGORY_KEYWORDS = {
+    'تقنية': ['tech', 'technology', 'برمج', 'تطوير', 'تقنية', 'ai', 'data', 'machine learning', 'برمجيات', 'software', 'hardware'],
+    'وظائف': ['وظيفة', 'توظيف', 'career', 'job', 'hiring', 'موظف', 'وظائف', 'تدريب', 'internship', 'job fair'],
+    'شركات ناشئة': ['ناشئة', 'startup', 'تمويل', 'funding', 'entrepreneur', 'شركة ناشئة', 'incubator', 'accelerator'],
+    'سوق': ['سوق', 'استثمار', 'سهم', 'بورصة', 'trade', 'تجارة', 'سعر', 'market', 'crypto', 'عملات'],
+    'مجتمع': ['مجتمع', 'events', 'لقاء', 'network', 'دعم', 'community', 'منظمة', 'نشاط', 'culture'],
+}
+
+CATEGORY_LABELS = ['تقنية', 'وظائف', 'شركات ناشئة', 'سوق', 'مجتمع']
+
+
+def detectCategory(content: str) -> str:
+    text = (content or '').lower()
+    for category, keywords in CATEGORY_KEYWORDS.items():
+        for keyword in keywords:
+            if keyword in text:
+                return category
+    return 'مجتمع'
+
+
+def rewriteHeadline(content: str) -> str:
+    text = (content or '').strip().replace('\n', ' ').replace('\r', ' ')
+    if not text:
+        return 'خبر رائج من SyrLink'
+    first_sentence = text.split('. ')[0].strip()
+    if len(first_sentence) < 12 and len(text) > 60:
+        first_sentence = text[:60].strip()
+    headline = first_sentence[:80].rstrip()
+    if len(text) > len(headline):
+        headline = headline.rstrip('.,') + '...'
+    return headline
+
+
+def summarizePost(content: str) -> str:
+    text = (content or '').strip().replace('\n', ' ').replace('\r', ' ')
+    if not text:
+        return 'اكتشف أهم الأخبار والمشاركات الرائجة على منصة SyrLink.'
+    sentences = [s.strip() for s in text.split('. ') if s.strip()]
+    if sentences:
+        summary = sentences[0]
+    else:
+        summary = text
+    if len(summary) > 120:
+        return summary[:117].rstrip() + '...'
+    return summary
+
+
+def timeAgo(created_at: str) -> str:
+    if not created_at:
+        return 'منذ قليل'
+    try:
+        dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+    except ValueError:
+        return 'منذ قليل'
+    diff = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) - dt.astimezone(datetime.timezone.utc)
+    seconds = int(diff.total_seconds())
+    if seconds < 60:
+        return 'منذ ثوانٍ'
+    if seconds < 3600:
+        minutes = seconds // 60
+        return f'قبل {minutes} دقيقة' if minutes == 1 else f'قبل {minutes} دقائق'
+    if seconds < 86400:
+        hours = seconds // 3600
+        return f'قبل {hours} ساعة' if hours == 1 else f'قبل {hours} ساعات'
+    days = seconds // 86400
+    return f'منذ يوم' if days == 1 else f'منذ {days} أيام'
+
+
+async def generateSyrLinkNews(limit: int = 10, refresh: bool = False):
+    global NEWS_CACHE, NEWS_CACHE_UPDATED
+    now = _t.time()
+    if NEWS_CACHE and not refresh and (now - NEWS_CACHE_UPDATED) < 3600:
+        return NEWS_CACHE
+
+    posts = await db.posts.find(
+        {},
+        {
+            '_id': 0,
+            'id': 1,
+            'content': 1,
+            'created_at': 1,
+            'likes_count': 1,
+            'comments_count': 1,
+            'views': 1,
+        },
+    ).to_list(500)
+
+    news_items = []
+    for post in posts:
+        score = post.get('views', 0) + (post.get('likes_count', 0) * 2) + (post.get('comments_count', 0) * 3)
+        if score <= 0:
+            continue
+        title = rewriteHeadline(post.get('content', ''))
+        summary = summarizePost(post.get('content', ''))
+        category = detectCategory(post.get('content', ''))
+        readers = random.randint(5000, 30000)
+        relative_time = timeAgo(post.get('created_at', ''))
+        news_items.append({
+            'id': f'news-{post["id"]}',
+            'post_id': post['id'],
+            'title': title,
+            'summary': summary,
+            'category': category,
+            'readers': readers,
+            'relative_time': relative_time,
+            'score': score,
+        })
+
+    news_items.sort(key=lambda item: item['score'], reverse=True)
+    NEWS_CACHE = news_items[:limit]
+    NEWS_CACHE_UPDATED = now
+    return NEWS_CACHE
 
 # Verification router
 verification_router = APIRouter(prefix="/verification", tags=["verification"])
@@ -505,14 +623,8 @@ util_router = APIRouter(tags=["utilities"])
 
 @util_router.get("/news")
 async def news():
-    """Get news feed."""
-    return [
-        {"id": "nw1", "title": "إعادة إعمار سوريا تبدأ بمشاريع تقنية ضخمة", "meta": "4h ago · 12,453 readers"},
-        {"id": "nw2", "title": "ارتفاع الطلب على المهندسين السوريين عن بُعد", "meta": "6h ago · 8,221 readers"},
-        {"id": "nw3", "title": "Damascus emerging as MENA's new tech hub", "meta": "1d ago · 5,109 readers"},
-        {"id": "nw4", "title": "أبرز الشركات الناشئة في حلب لعام 2026", "meta": "1d ago · 14,322 readers"},
-        {"id": "nw5", "title": "SyrLink hits 100K users in first month", "meta": "2d ago · 22,540 readers"},
-    ]
+    """Get news feed based on top circulating posts."""
+    return await generateSyrLinkNews()
 
 
 @admin_router.get("/companies")

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Plus, Info } from 'lucide-react';
 import { newsApi } from '../api';
 
@@ -19,9 +20,11 @@ export default function RightSidebar() {
         <p className="text-xs text-gray-600">Top stories</p>
         <ul className="mt-2 space-y-2">
           {news.map((n) => (
-            <li key={n.id} className="text-sm cursor-pointer hover:bg-gray-50 rounded px-1 py-1">
-              <p className="font-semibold leading-tight">• {n.title}</p>
-              <p className="text-[11px] text-gray-500 ml-2">{n.meta}</p>
+            <li key={n.id} className="text-sm hover:bg-gray-50 rounded px-1 py-1">
+              <Link to={`/#news-post-${n.post_id}`} className="block">
+                <p className="font-semibold leading-tight">• {n.title}</p>
+                <p className="text-[11px] text-gray-500 ml-2">{n.category} · {n.relative_time} · {n.readers.toLocaleString()} قارئ</p>
+              </Link>
             </li>
           ))}
         </ul>

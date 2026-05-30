@@ -174,7 +174,7 @@ const PostCardComponent = ({ post }) => {
 
   return (
     <>
-      <article className="li-card overflow-hidden">
+      <article id={`news-post-${post.id}`} className="li-card overflow-hidden">
       {/* Header */}
       <div className="flex items-start gap-2 p-3 pb-2">
         <Link to={post.company_id ? `/company/${post.company_id}` : `/in/${post.author.id}`} className="shrink-0">
