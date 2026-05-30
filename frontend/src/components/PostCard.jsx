@@ -31,7 +31,7 @@ const REACTIONS = [
 ];
 
 const PostCardComponent = ({ post }) => {
-  const { toggleLike, commentsByPost, addComment, repostPost, user, deletePost, updatePost } = useApp();
+  const { toggleLike, commentsByPost, loadComments, addComment, repostPost, user, deletePost, updatePost } = useApp();
   const [showComments, setShowComments] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [pop, setPop] = useState(false);
@@ -57,6 +57,23 @@ const PostCardComponent = ({ post }) => {
     setPop(true);
     setTimeout(() => setPop(false), 300);
     setShowReactions(false);
+  };
+
+  const toggleComments = () => {
+    const willOpen = !showComments;
+    setShowComments(willOpen);
+    if (willOpen && !commentsByPost[post.id]) {
+      loadComments(post.id).catch((e) => console.warn('Failed loading comments', e));
+    }
+  };
+
+  const reactionIconFor = (reaction) => {
+    switch (reaction) {
+      case 'support': return <Heart className={`w-5 h-5 ${pop ? 'pop' : ''}`} fill={post.liked ? '#ff4567' : 'none'} />;
+      case 'celebrate': return <Sparkles className={`w-5 h-5 ${pop ? 'pop' : ''}`} />;
+      case 'insightful': return <Lightbulb className={`w-5 h-5 ${pop ? 'pop' : ''}`} />;
+      default: return <ThumbsUp className={`w-5 h-5 ${pop ? 'pop' : ''}`} fill={post.liked ? '#0a66c2' : 'none'} />;
+    }
   };
 
   const onSimpleRepost = async () => {
@@ -230,8 +247,8 @@ const PostCardComponent = ({ post }) => {
               post.liked ? 'text-[#0a66c2]' : 'text-gray-600'
             }`}
           >
-            <ThumbsUp className={`w-5 h-5 ${pop ? 'pop' : ''}`} fill={post.liked ? '#0a66c2' : 'none'} />
-            Like
+            {reactionIconFor(post.reaction)}
+            {post.reaction && post.reaction !== 'like' ? (post.reaction === 'support' ? 'Support' : post.reaction.charAt(0).toUpperCase() + post.reaction.slice(1)) : 'Like'}
           </button>
 
           {showReactions && (
@@ -249,8 +266,8 @@ const PostCardComponent = ({ post }) => {
             </div>
           )}
         </div>
-        <button
-          onClick={() => setShowComments((s) => !s)}
+          <button
+          onClick={toggleComments}
           className="flex-1 flex items-center justify-center gap-2 py-2 rounded text-sm font-semibold text-gray-600 hover:bg-gray-100"
         >
           <MessageSquare className="w-5 h-5" />
@@ -344,6 +361,7 @@ export default memo(
     prev.post.id === next.post.id &&
     prev.post.liked === next.post.liked &&
     prev.post.likes === next.post.likes &&
+    prev.post.reaction === next.post.reaction &&
     prev.post.comments === next.post.comments &&
     prev.post.content === next.post.content &&
     prev.post.image === next.post.image

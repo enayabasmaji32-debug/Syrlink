@@ -264,18 +264,20 @@ export function AppProvider({ children }) {
       : p));
     try {
       // Use new react endpoint if reaction type is specified
-      if (reactionType && reactionType !== 'like') {
-        const res = await postsApi.react(postId, reactionType);
-        setPosts((all) => all.map((p) => p.id === postId
-          ? { ...p, liked: res.reaction !== null, likes: res.count }
-          : p));
-      } else {
-        // Fall back to like endpoint for default like
-        const res = await postsApi.like(postId);
-        setPosts((all) => all.map((p) => p.id === postId
-          ? { ...p, liked: res.liked, likes: res.likes_count }
-          : p));
-      }
+        if (reactionType && reactionType !== 'like') {
+          const res = await postsApi.react(postId, reactionType);
+          const newLikes = res.count ?? res.likes_count ?? res.count ?? undefined;
+          setPosts((all) => all.map((p) => p.id === postId
+            ? { ...p, liked: res.reaction !== null, likes: typeof newLikes === 'number' ? newLikes : p.likes, reaction: res.reaction }
+            : p));
+        } else {
+          // Fall back to like endpoint for default like
+          const res = await postsApi.like(postId);
+          const newLikes = res.count ?? res.likes_count ?? res.count ?? undefined;
+          setPosts((all) => all.map((p) => p.id === postId
+            ? { ...p, liked: res.liked, likes: typeof newLikes === 'number' ? newLikes : p.likes, reaction: res.liked ? 'like' : null }
+            : p));
+        }
     } catch (e) {
       // revert on error
       setPosts((all) => all.map((p) => p.id === postId

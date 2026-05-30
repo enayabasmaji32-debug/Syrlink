@@ -39,7 +39,7 @@ async def batch_fetch_companies(company_ids: List[str]) -> Dict[str, Dict[str, A
 
 
 
-async def serialize_post_with_author(post: Dict[str, Any], author: Dict[str, Any], current_user_id: str, liked: bool) -> Dict[str, Any]:
+async def serialize_post_with_author(post: Dict[str, Any], author: Dict[str, Any], current_user_id: str, liked: bool, reaction: Optional[str] = None) -> Dict[str, Any]:
     """Serialize a post with pre-fetched author and like status."""
     return {
         "id": post["id"],
@@ -51,6 +51,7 @@ async def serialize_post_with_author(post: Dict[str, Any], author: Dict[str, Any
         "comments": post.get("comments_count", 0),
         "reposts": post.get("reposts_count", 0),
         "liked": liked,
+        "reaction": reaction,
         "created_at": post["created_at"],
         "timeAgo": time_ago(post["created_at"]),
         "company_id": post.get("company_id"),
@@ -107,10 +108,10 @@ async def list_posts(cursor: Optional[str] = None, limit: int = 5, company_id: O
     user_map = await batch_fetch_users(user_ids)
     company_map = await batch_fetch_companies(company_ids)
     
-    # Batch fetch all likes at once (instead of N separate queries)
+    # Batch fetch all likes/reactions for current user at once (include reaction)
     post_ids = [p["id"] for p in posts]
-    likes = await db.post_likes.find({"post_id": {"$in": post_ids}, "user_id": current["id"]}, {"post_id": 1}).to_list(limit)
-    liked_post_ids = {like["post_id"] for like in likes}
+    likes = await db.post_likes.find({"post_id": {"$in": post_ids}, "user_id": current["id"]}, {"post_id": 1, "reaction": 1}).to_list(len(post_ids))
+    reaction_map = {like["post_id"]: like.get("reaction", "like") for like in likes}
     
     # Serialize all posts in parallel (not sequential)
     items = await asyncio.gather(*[
@@ -118,7 +119,8 @@ async def list_posts(cursor: Optional[str] = None, limit: int = 5, company_id: O
             p,
             company_map[p["company_id"]] if p.get("company_id") else user_map[p["author_id"]],
             current["id"],
-            p["id"] in liked_post_ids,
+            p["id"] in reaction_map,
+            reaction_map.get(p["id"]),
         )
         for p in posts
     ])
@@ -462,4 +464,4 @@ async def repost(post_id: str, data: RepostIn, current=Depends(get_current_user)
         "avatar": current.get("avatar", ""),
         "headline": current.get("headline", ""),
     }
-    return await serialize_post_with_author(new_post, author, current["id"], False)
+    return await serialize_post_with_author(new_post, author, current["id"], False, None)
