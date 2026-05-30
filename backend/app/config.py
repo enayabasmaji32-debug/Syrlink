@@ -51,5 +51,5 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLECLIENTSECRET") or os.getenv("GOOGLE_CLIE
 GOOGLE_OAUTH_REDIRECT = os.getenv("GOOGLEREDIRECTURI", "") or os.getenv("GOOGLE_OAUTH_REDIRECT", "")
 
 # Admin defaults
-ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@syrlink.com").lower()
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "basmajienaya@gmail.com").lower()
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Admin@SyrLink2026")
