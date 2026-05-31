@@ -20,8 +20,7 @@ import {
 import { useApp } from '../context/AppContext';
 import ReportModal from '../components/ReportModal';
 import VerificationRequest from '../components/VerificationRequest';
-import VerificationRequestProfessional from '../components/VerificationRequestProfessional';
-import VerificationTracking from '../components/VerificationTracking';
+import VerificationStatus from '../components/VerificationStatus';
 import { RecommendationsSection, EndorsementsSection } from '../components/ProfessionalSections';
 import { usersApi } from '../api';
 import { showImageLightbox } from '../components/ui/ImageLightbox';
@@ -292,8 +291,8 @@ export default function Profile() {
         </div>
       </div>
 
-      {verifOpen && <VerificationRequestProfessional onClose={() => setVerifOpen(false)} />}
-      <VerificationTracking />
+      {verifOpen && <VerificationRequest onClose={() => setVerifOpen(false)} />}
+      {isMe && <VerificationStatus />}
       <ReportModal
         isOpen={showReport}
         onClose={() => setShowReport(false)}
