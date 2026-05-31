@@ -326,8 +326,8 @@ async def admin_approve_verification(
 )
 async def admin_reject_verification(
     req_id: str,
+    admin: Annotated[dict, Depends(require_admin)],
     reason: str = "",
-    admin: Annotated[dict, Depends(require_admin)] = Depends(require_admin),
 ):
     """Reject a verification request."""
     req = await db.verification_requests.find_one({"id": req_id})
