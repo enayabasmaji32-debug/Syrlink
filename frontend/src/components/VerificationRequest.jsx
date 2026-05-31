@@ -29,18 +29,22 @@ export default function VerificationRequest({ onClose }) {
       const reader = new FileReader();
       reader.onload = (ev) => {
         const result = ev.target?.result;
+        console.log(`[${type}] File loaded:`, { fileName: f.name, size: f.size, preview: result ? 'set' : 'null' });
         if (type === 'idFront') {
           setIdFront(f);
           setIdFrontPreview(result);
         } else if (type === 'idBack') {
           setIdBack(f);
           setIdBackPreview(result);
+          console.log('[idBack] State updated - idBackPreview should now be:', result ? 'loaded' : 'null');
         } else if (type === 'selfie') {
           setSelfie(f);
           setSelfiePreview(result);
         }
       };
       reader.readAsDataURL(f);
+    } else {
+      console.warn(`No file selected for ${type}`);
     }
   };
 
@@ -109,7 +113,7 @@ export default function VerificationRequest({ onClose }) {
   // ===== STEP 1: ID Front =====
   if (step === 1) {
     return (
-      <Dialog open={true} onOpenChange={onClose}>
+      <Dialog key="step-1-dialog" open={true} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="bg-gradient-to-r from-[#0a66c2] to-[#005ba1] text-white rounded-lg -mx-6 -mt-6 px-6 py-4 mb-6">
             <div className="flex items-center justify-between">
@@ -153,12 +157,24 @@ export default function VerificationRequest({ onClose }) {
             </div>
 
             {idFrontPreview && (
-              <div className="border-2 border-green-200 bg-green-50 rounded-xl p-4">
+              <div className="border-2 border-green-200 bg-green-50 rounded-xl p-4 animate-pulse">
                 <div className="flex items-center gap-2 mb-3">
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  <p className="text-sm font-semibold text-green-800">ID Front Uploaded</p>
+                  <p className="text-sm font-semibold text-green-800">✓ ID Front Uploaded Successfully</p>
                 </div>
-                <img src={idFrontPreview} alt="preview" className="max-h-40 rounded-lg w-full object-cover" />
+                <img 
+                  src={idFrontPreview} 
+                  alt="ID Front Preview" 
+                  className="max-h-40 rounded-lg w-full object-cover border border-green-300" 
+                  onLoad={() => console.log('[idFront] Image loaded in DOM')}
+                  onError={(e) => console.error('[idFront] Image failed to load:', e)}
+                />
+              </div>
+            )}
+            
+            {!idFrontPreview && (
+              <div className="text-center py-4 text-gray-500 text-sm">
+                <p>Waiting for image upload...</p>
               </div>
             )}
 
@@ -187,7 +203,7 @@ export default function VerificationRequest({ onClose }) {
   // ===== STEP 2: ID Back =====
   if (step === 2) {
     return (
-      <Dialog open={true} onOpenChange={onClose}>
+      <Dialog key="step-2-dialog" open={true} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="bg-gradient-to-r from-[#0a66c2] to-[#005ba1] text-white rounded-lg -mx-6 -mt-6 px-6 py-4 mb-6">
             <div className="flex items-center justify-between">
@@ -231,12 +247,24 @@ export default function VerificationRequest({ onClose }) {
             </div>
 
             {idBackPreview && (
-              <div className="border-2 border-green-200 bg-green-50 rounded-xl p-4">
+              <div className="border-2 border-green-200 bg-green-50 rounded-xl p-4 animate-pulse">
                 <div className="flex items-center gap-2 mb-3">
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  <p className="text-sm font-semibold text-green-800">ID Back Uploaded</p>
+                  <p className="text-sm font-semibold text-green-800">✓ ID Back Uploaded Successfully</p>
                 </div>
-                <img src={idBackPreview} alt="preview" className="max-h-40 rounded-lg w-full object-cover" />
+                <img 
+                  src={idBackPreview} 
+                  alt="ID Back Preview" 
+                  className="max-h-40 rounded-lg w-full object-cover border border-green-300" 
+                  onLoad={() => console.log('[idBack] Image loaded in DOM')}
+                  onError={(e) => console.error('[idBack] Image failed to load:', e)}
+                />
+              </div>
+            )}
+            
+            {!idBackPreview && (
+              <div className="text-center py-4 text-gray-500 text-sm">
+                <p>Waiting for image upload...</p>
               </div>
             )}
 
@@ -265,7 +293,7 @@ export default function VerificationRequest({ onClose }) {
   // ===== STEP 3: Live Selfie =====
   if (step === 3) {
     return (
-      <Dialog open={true} onOpenChange={onClose}>
+      <Dialog key="step-3-dialog" open={true} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="bg-gradient-to-r from-[#0a66c2] to-[#005ba1] text-white rounded-lg -mx-6 -mt-6 px-6 py-4 mb-6">
             <div className="flex items-center justify-between">
@@ -314,12 +342,24 @@ export default function VerificationRequest({ onClose }) {
             </div>
 
             {selfiePreview && (
-              <div className="border-2 border-green-200 bg-green-50 rounded-xl p-4">
+              <div className="border-2 border-green-200 bg-green-50 rounded-xl p-4 animate-pulse">
                 <div className="flex items-center gap-2 mb-3">
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  <p className="text-sm font-semibold text-green-800">Selfie Captured</p>
+                  <p className="text-sm font-semibold text-green-800">✓ Selfie Captured Successfully</p>
                 </div>
-                <img src={selfiePreview} alt="selfie" className="max-h-40 rounded-lg w-full object-cover" />
+                <img 
+                  src={selfiePreview} 
+                  alt="Selfie Preview" 
+                  className="max-h-40 rounded-lg w-full object-cover border border-green-300" 
+                  onLoad={() => console.log('[selfie] Image loaded in DOM')}
+                  onError={(e) => console.error('[selfie] Image failed to load:', e)}
+                />
+              </div>
+            )}
+            
+            {!selfiePreview && (
+              <div className="text-center py-4 text-gray-500 text-sm">
+                <p>Waiting for selfie capture...</p>
               </div>
             )}
 
@@ -348,7 +388,7 @@ export default function VerificationRequest({ onClose }) {
   // ===== STEP 4: Review =====
   if (step === 4) {
     return (
-      <Dialog open={true} onOpenChange={onClose}>
+      <Dialog key="step-4-dialog" open={true} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="bg-gradient-to-r from-[#0a66c2] to-[#005ba1] text-white rounded-lg -mx-6 -mt-6 px-6 py-4 mb-6">
             <div className="flex items-center justify-between">
@@ -432,7 +472,7 @@ export default function VerificationRequest({ onClose }) {
 
   // ===== STEP 5: Submit & Confirmation =====
   return (
-    <Dialog open={true} onOpenChange={onClose}>
+    <Dialog key="step-5-dialog" open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg -mx-6 -mt-6 px-6 py-4 mb-6">
           <div className="flex items-center justify-between">
