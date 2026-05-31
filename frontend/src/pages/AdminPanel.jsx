@@ -59,7 +59,16 @@ export default function AdminPanel() {
     await adminApi.deleteUser(uid); toast.success('User deleted'); load();
   };
   const approve = async (id) => { await adminApi.approve(id); toast.success('Approved + verified'); load(); };
-  const reject = async (id) => { await adminApi.reject(id); toast('Request rejected'); load(); };
+  const reject = async (id, reason = '') => { 
+    if (reason) {
+      await adminApi.reject(id, reason); 
+      toast.success('Request rejected with reason');
+    } else {
+      await adminApi.reject(id); 
+      toast('Request rejected');
+    }
+    load(); 
+  };
   const decideCompany = async (action) => {
     if (!decisionModal) {
       toast.error('حدث خطأ، حاول مرة أخرى');
@@ -214,22 +223,78 @@ export default function AdminPanel() {
       {tab === 'verifications' && (
         <div className="li-card p-3">
           {verifs.length === 0 && <p className="text-sm text-gray-500 text-center py-6">No pending verification requests.</p>}
-          <ul className="divide-y divide-gray-100">
+          <ul className="divide-y divide-gray-200">
             {verifs.map((r) => (
-              <li key={r.id} className="py-3 flex items-start gap-3">
-                <img src={r.user?.avatar} alt="" className="w-12 h-12 rounded-full object-cover" />
-                <div className="flex-1">
-                  <div className="font-semibold text-sm">{r.user?.name}</div>
-                  <p className="text-xs text-gray-600">{r.user?.headline}</p>
-                  <p className="text-xs mt-1">Type: <b>{r.document_type}</b></p>
-                  {r.note && <p className="text-xs text-gray-700 italic mt-1">"{r.note}"</p>}
-                  <a href={r.document_url} target="_blank" rel="noreferrer" className="text-xs text-[#0a66c2] hover:underline">View document →</a>
+              <li key={r.id} className="py-4">
+                <div className="flex items-start gap-3 mb-3">
+                  <img src={r.user?.avatar} alt="" className="w-12 h-12 rounded-full object-cover" />
+                  <div className="flex-1">
+                    <div className="font-semibold text-sm text-gray-900">{r.user?.name}</div>
+                    <p className="text-xs text-gray-600">{r.user?.email}</p>
+                    {r.request_id && (
+                      <p className="text-xs text-blue-600 font-mono mt-1">ID: {r.request_id}</p>
+                    )}
+                  </div>
+                  <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                    {r.current_stage?.replace('_', ' ').toUpperCase() || 'IDENTITY CHECK'}
+                  </span>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <button onClick={() => approve(r.id)} className="text-xs font-semibold bg-green-600 text-white rounded-full px-3 py-1 flex items-center gap-1" data-testid={`admin-approve-${r.id}`}>
+
+                {/* Document Info */}
+                <div className="bg-gray-50 rounded p-3 mb-3 text-xs space-y-1">
+                  <p><strong>Document Type:</strong> {r.document_type}</p>
+                  {r.note && <p><strong>Note:</strong> {r.note}</p>}
+                  <p className="text-gray-600">Submitted: {new Date(r.created_at).toLocaleDateString()}</p>
+                  <a href={r.document_url} target="_blank" rel="noreferrer" className="text-[#0a66c2] hover:underline">
+                    View document →
+                  </a>
+                </div>
+
+                {/* Stages Progress */}
+                <div className="mb-3 flex gap-1 text-xs">
+                  {['identity_check', 'face_match', 'under_review', 'final_decision'].map((stage) => {
+                    const isCompleted = r.stages_completed?.includes(stage);
+                    const isCurrent = r.current_stage === stage;
+                    return (
+                      <button
+                        key={stage}
+                        onClick={() => adminApi.updateStage(r.id, stage)}
+                        className={`px-2 py-1 rounded transition text-xs font-semibold ${
+                          isCompleted
+                            ? 'bg-green-100 text-green-700'
+                            : isCurrent
+                            ? 'bg-blue-200 text-blue-900 border-2 border-blue-600'
+                            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                        }`}
+                        title={`Mark as ${stage.replace('_', ' ')}`}
+                      >
+                        {stage === 'identity_check' && '🔍'}
+                        {stage === 'face_match' && '👤'}
+                        {stage === 'under_review' && '⏳'}
+                        {stage === 'final_decision' && '✓'}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => approve(r.id)}
+                    className="flex-1 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-full px-3 py-2 flex items-center justify-center gap-1"
+                  >
                     <CheckCircle2 className="w-3 h-3" /> Approve
                   </button>
-                  <button onClick={() => reject(r.id)} className="text-xs font-semibold border border-gray-400 text-gray-700 rounded-full px-3 py-1 flex items-center gap-1" data-testid={`admin-reject-${r.id}`}>
+                  <button
+                    onClick={() => {
+                      const reason = prompt('Rejection reason:');
+                      if (reason) {
+                        adminApi.reject(r.id, reason);
+                        load();
+                      }
+                    }}
+                    className="flex-1 text-xs font-semibold border border-red-400 text-red-600 rounded-full px-3 py-2 hover:bg-red-50 flex items-center justify-center gap-1"
+                  >
                     <XCircle className="w-3 h-3" /> Reject
                   </button>
                 </div>

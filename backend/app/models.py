@@ -162,13 +162,18 @@ class ConversationIn(BaseModel):
 
 
 # ===========================================================================
-# Verification
+# Verification - Global Professional System
 # ===========================================================================
 
 class VerificationRequestIn(BaseModel):
     document_url: str
     document_type: Literal["id", "experience", "education", "other"]
     note: Optional[str] = ""
+
+
+# Global verification stages: Identity Check → Face Match → Under Review → Final Decision
+VERIFICATION_STAGES = ["identity_check", "face_match", "under_review", "final_decision"]
+VERIFICATION_STATUSES = ["pending", "approved", "rejected"]
 
 
 # ===========================================================================

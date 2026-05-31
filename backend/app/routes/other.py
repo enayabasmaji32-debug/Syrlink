@@ -173,16 +173,23 @@ async def submit_verification(
     if existing:
         raise HTTPException(status_code=400, detail="You already have a pending verification request")
     
+    # Generate global request ID (e.g., VR-2026-05-31-ABC123)
+    request_id = f"VR-{uid()[:8].upper()}"
+    
     doc = {
         "id": uid(),
+        "request_id": request_id,  # Global request ID for tracking
         "user_id": current["id"],
         "document_url": data.document_url,
         "document_type": data.document_type,
         "note": data.note or "",
         "status": "pending",
+        "current_stage": "identity_check",  # Global stage: identity_check → face_match → under_review → final_decision
+        "stages_completed": [],
         "created_at": now_iso(),
         "reviewed_at": None,
         "reviewed_by": None,
+        "rejection_reason": None,
     }
     await db.verification_requests.insert_one(doc)
     doc.pop("_id", None)
@@ -297,7 +304,13 @@ async def admin_approve_verification(
     
     await db.verification_requests.update_one(
         {"id": req_id},
-        {"$set": {"status": "approved", "reviewed_at": now_iso(), "reviewed_by": admin["id"]}},
+        {"$set": {
+            "status": "approved",
+            "current_stage": "final_decision",
+            "stages_completed": ["identity_check", "face_match", "under_review", "final_decision"],
+            "reviewed_at": now_iso(),
+            "reviewed_by": admin["id"],
+        }},
     )
     await db.users.update_one({"id": req["user_id"]}, {"$set": {"verified": True}})
     await create_notification(
@@ -313,7 +326,8 @@ async def admin_approve_verification(
 )
 async def admin_reject_verification(
     req_id: str,
-    admin: Annotated[dict, Depends(require_admin)],
+    reason: str = "",
+    admin: Annotated[dict, Depends(require_admin)] = Depends(require_admin),
 ):
     """Reject a verification request."""
     req = await db.verification_requests.find_one({"id": req_id})
@@ -322,13 +336,62 @@ async def admin_reject_verification(
     
     await db.verification_requests.update_one(
         {"id": req_id},
-        {"$set": {"status": "rejected", "reviewed_at": now_iso(), "reviewed_by": admin["id"]}},
+        {"$set": {
+            "status": "rejected",
+            "reviewed_at": now_iso(),
+            "reviewed_by": admin["id"],
+            "rejection_reason": reason or "Request did not meet requirements",
+        }},
     )
     await create_notification(
         user_id=req["user_id"], actor_id=admin["id"], ntype="verification",
-        text="Your verification request was reviewed — please contact support for more info.", target_id=req_id,
+        text=f"Your verification request was reviewed — {reason or 'Please contact support for more info.'}", target_id=req_id,
     )
     return {"ok": True}
+
+
+@admin_router.post(
+    "/verification-requests/{req_id}/stage",
+    responses={404: {"description": "Request not found"}},
+)
+async def admin_update_verification_stage(
+    req_id: str,
+    new_stage: str,
+    admin: Annotated[dict, Depends(require_admin)],
+):
+    """Update verification request stage."""
+    req = await db.verification_requests.find_one({"id": req_id})
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    valid_stages = ["identity_check", "face_match", "under_review", "final_decision"]
+    if new_stage not in valid_stages:
+        raise HTTPException(status_code=400, detail="Invalid stage")
+    
+    stages_completed = req.get("stages_completed", [])
+    if new_stage not in stages_completed:
+        stages_completed.append(new_stage)
+    
+    await db.verification_requests.update_one(
+        {"id": req_id},
+        {"$set": {
+            "current_stage": new_stage,
+            "stages_completed": stages_completed,
+        }},
+    )
+    
+    stage_labels = {
+        "identity_check": "Identity Verification",
+        "face_match": "Face Matching",
+        "under_review": "Under Review",
+        "final_decision": "Final Decision",
+    }
+    
+    await create_notification(
+        user_id=req["user_id"], actor_id=admin["id"], ntype="verification",
+        text=f"Your verification request is now at: {stage_labels.get(new_stage, new_stage)}", target_id=req_id,
+    )
+    return {"ok": True, "stage": new_stage}
 
 
 @admin_router.get(
