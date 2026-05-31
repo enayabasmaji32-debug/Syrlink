@@ -80,11 +80,11 @@ export default function VerificationRequest({ onClose }) {
   // ===== Helper: Progress Bar =====
   const renderProgressBar = () => {
     const steps = [
-      { num: 1, label: 'ID Front', icon: '🪪' },
-      { num: 2, label: 'ID Back', icon: '🔙' },
-      { num: 3, label: 'Live Selfie', icon: '🤳' },
-      { num: 4, label: 'Review', icon: '👀' },
-      { num: 5, label: 'Submit', icon: '✓' },
+      { num: 1, label: 'ID Front' },
+      { num: 2, label: 'ID Back' },
+      { num: 3, label: 'Live Selfie' },
+      { num: 4, label: 'Review' },
+      { num: 5, label: 'Submit' },
     ];
     return (
       <div className="space-y-2 mb-8">
@@ -98,7 +98,7 @@ export default function VerificationRequest({ onClose }) {
         <div className="flex gap-1 text-xs font-semibold text-gray-600">
           {steps.map((s) => (
             <div key={s.num} className="flex-1 text-center">
-              <span className={s.num <= step ? 'text-[#0a66c2]' : 'text-gray-400'}>{s.icon}</span>
+              <span className={s.num <= step ? 'text-[#0a66c2] text-lg' : 'text-gray-400 text-lg'}>●</span>
             </div>
           ))}
         </div>
@@ -479,21 +479,21 @@ export default function VerificationRequest({ onClose }) {
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <span className="text-lg">👤</span>
+                <span className="text-lg">●</span>
                 <div>
                   <p className="font-semibold text-gray-900">Face Match</p>
                   <p className="text-xs text-gray-600">We match your selfie with ID</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <span className="text-lg">⏳</span>
+                <span className="text-lg">▸</span>
                 <div>
                   <p className="font-semibold text-gray-900">Liveness Check</p>
                   <p className="text-xs text-gray-600">We verify the selfie is genuine</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <span className="text-lg">📝</span>
+                <span className="text-lg">▪</span>
                 <div>
                   <p className="font-semibold text-gray-900">Under Review</p>
                   <p className="text-xs text-gray-600">Final verification process</p>
@@ -510,7 +510,7 @@ export default function VerificationRequest({ onClose }) {
           </div>
 
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <p className="text-xs text-amber-800"><strong>⏱️ Processing Time:</strong> Most verifications are completed within 24-48 hours. You'll receive a notification when your status changes.</p>
+            <p className="text-xs text-amber-800"><strong>⏱ Processing Time:</strong> Most verifications are completed within 24-48 hours. You'll receive a notification when your status changes.</p>
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

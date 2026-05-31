@@ -60,9 +60,9 @@ A **professional, multi-step verification system** designed to meet internationa
 ```
 
 ### **Visual Elements**
-- Emojis for clarity: 🪪 🔙 🤳 👀 ✓
+- Visual elements: Unicode symbols for professional appearance (● ▸ ▪ ✓)
 - Status badges with color coding
-- Progress indicators (green ✓, blue 🔄, gray ⏳)
+- Progress indicators (green ✓, blue ▸, gray ◇)
 - Icons from Lucide React for consistency
 
 ### **Security Features**
@@ -77,17 +77,17 @@ A **professional, multi-step verification system** designed to meet internationa
 
 The system tracks verification through 4 backend stages:
 
-1. **🔍 Identity Check**
+1. **▸ Identity Check**
    - System verifies ID documents
    - Document authenticity checks
    - Quality validation
 
-2. **👤 Face Match**
+2. **● Face Match**
    - Compare selfie with ID photo
    - Facial recognition matching
    - Liveness verification
 
-3. **📝 Under Review**
+3. **▪ Under Review**
    - Final manual verification
    - Admin approval process
    - Decision making
@@ -118,7 +118,7 @@ Profile → View Verification Status
 ├─ Request ID: VR-ABC123 (copyable)
 ├─ Current Status: Pending/Approved/Rejected
 ├─ Stage Timeline:
-│  ├─ ✓ Identity Check (Done)
+├─ ✓ Identity Check (Done)
 │  ├─ 🔄 Face Match (Current)
 │  ├─ ⏳ Under Review (Pending)
 │  └─ ⏳ Final Decision (Pending)
@@ -266,10 +266,10 @@ Admin Panel → Verifications Tab
 │  ├─ Submission date
 │  └─ User notes
 ├─ Action Buttons:
-│  ├─ 🔍 View (Full document view)
-│  ├─ ✓ Approve (Move to final_decision → approved)
-│  ├─ ❌ Reject (with reason)
-│  └─ 📝 Update Stage (manual stage management)
+├─ ▸ View (Full document view)
+├─ ✓ Approve (Move to final_decision → approved)
+├─ ❌ Reject (with reason)
+└─ ▪ Update Stage (manual stage management)
 └─ Batch Operations (coming soon)
 ```
 

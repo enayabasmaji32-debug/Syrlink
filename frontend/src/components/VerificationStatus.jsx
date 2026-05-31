@@ -30,22 +30,22 @@ export default function VerificationStatus() {
   
   const stageInfo = {
     'identity_check': {
-      emoji: '🔍',
+      icon: '▸',
       label: 'Identity Check',
       description: 'Verifying your ID documents'
     },
     'face_match': {
-      emoji: '👤',
+      icon: '▸',
       label: 'Face Match',
       description: 'Matching your face with ID'
     },
     'under_review': {
-      emoji: '📝',
+      icon: '▸',
       label: 'Under Review',
       description: 'Final verification in progress'
     },
     'final_decision': {
-      emoji: '✓',
+      icon: '✓',
       label: 'Final Decision',
       description: 'Getting your blue badge'
     },
@@ -58,7 +58,7 @@ export default function VerificationStatus() {
 
   const statusConfig = {
     pending: {
-      title: '⏳ Verification in Progress',
+      title: '▸ Verification in Progress',
       color: 'from-orange-100 to-orange-50',
       borderColor: 'border-orange-200',
       badge: 'bg-orange-100 text-orange-800',
@@ -132,14 +132,14 @@ export default function VerificationStatus() {
                 <div key={stage} className="flex gap-4">
                   {/* Timeline connector */}
                   <div className="flex flex-col items-center">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition ${
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg transition ${
                       completed
                         ? 'bg-green-100 text-green-700 border-2 border-green-600'
                         : isCurrent
                         ? 'bg-[#0a66c2] text-white border-2 border-[#004182] animate-pulse'
                         : 'bg-gray-200 text-gray-600 border-2 border-gray-300'
                     }`}>
-                      {completed ? '✓' : info.emoji}
+                      {completed ? '✓' : info.icon}
                     </div>
                     {idx < allStages.length - 1 && (
                       <div className={`w-1 h-8 my-1 ${completed ? 'bg-green-300' : 'bg-gray-300'}`} />
@@ -169,11 +169,11 @@ export default function VerificationStatus() {
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
                 <span className="text-gray-700">
-                  {request.document_type === 'id_front' ? '🪪 ID - Front' :
-                   request.document_type === 'id' ? '🪪 ID Document' :
-                   request.document_type === 'experience' ? '💼 Work Certificate' :
-                   request.document_type === 'education' ? '🎓 Diploma' :
-                   '📄 Document'}
+                  {request.document_type === 'id_front' ? 'ID - Front' :
+                   request.document_type === 'id' ? 'ID Document' :
+                   request.document_type === 'experience' ? 'Work Certificate' :
+                   request.document_type === 'education' ? 'Diploma' :
+                   'Document'}
                 </span>
                 <a href={request.document_url} target="_blank" rel="noreferrer" className="text-[#0a66c2] hover:text-[#005ba1] font-semibold flex items-center gap-1 transition">
                   View <ExternalLink className="w-3 h-3" />
@@ -236,7 +236,7 @@ export default function VerificationStatus() {
         {request.status === 'pending' && (
           <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
             <p className="text-sm text-amber-800">
-              ⏱️ <strong>Most verifications are completed within 24-48 hours.</strong> You'll receive a notification when your status changes. Save your Request ID for future reference.
+              <strong>▸ Most verifications are completed within 24-48 hours.</strong> You'll receive a notification when your status changes. Save your Request ID for future reference.
             </p>
           </div>
         )}
@@ -244,7 +244,7 @@ export default function VerificationStatus() {
         {request.status === 'approved' && (
           <div className="bg-green-50 rounded-xl p-4 border border-green-200">
             <p className="text-sm text-green-800">
-              🎉 <strong>Congratulations!</strong> Your account is now verified. You can display your blue badge on your profile.
+              <strong>✓ Congratulations!</strong> Your account is now verified. You can display your blue badge on your profile.
             </p>
           </div>
         )}
@@ -253,7 +253,7 @@ export default function VerificationStatus() {
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200 flex items-start gap-3">
           <Shield className="w-5 h-5 text-[#0a66c2] flex-shrink-0 mt-0.5" />
           <p className="text-xs text-blue-800">
-            <strong>🔒 Your data is secure.</strong> All documents are encrypted end-to-end. We never store raw photos.
+            <strong>▪ Your data is secure.</strong> All documents are encrypted end-to-end. We never store raw photos.
           </p>
         </div>
       </div>
