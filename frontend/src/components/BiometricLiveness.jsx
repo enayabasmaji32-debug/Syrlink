@@ -139,13 +139,31 @@ export default function BiometricLiveness({ onComplete, onBack }) {
     try {
       await tf.ready();
       console.log('TensorFlow.js ready');
-      console.log('Available models:', faceDetection.SupportedModels);
+      console.log('Available models:', JSON.stringify(faceDetection.SupportedModels, null, 2));
 
       let modelLoaded = false;
 
-      if (faceDetection.SupportedModels?.BlazeFace) {
+      if (faceDetection.SupportedModels?.MediaPipeFaceDetector) {
         try {
-          console.log('Attempting SupportedModels.BlazeFace initialization...');
+          console.log('Attempting SupportedModels.MediaPipeFaceDetector initialization...');
+          detectorRef.current = await faceDetection.createDetector(
+            faceDetection.SupportedModels.MediaPipeFaceDetector,
+            {
+              runtime: 'mediapipe',
+              maxFaces: 1,
+              flipHorizontal: false,
+            }
+          );
+          console.log('✓ MediaPipeFaceDetector loaded via SupportedModels');
+          modelLoaded = true;
+        } catch (err) {
+          console.warn('MediaPipeFaceDetector initialization failed:', err.message || err);
+        }
+      }
+
+      if (!modelLoaded && faceDetection.SupportedModels?.BlazeFace) {
+        try {
+          console.log('Attempting SupportedModels.BlazeFace initialization as fallback...');
           detectorRef.current = await faceDetection.createDetector(
             faceDetection.SupportedModels.BlazeFace,
             {
@@ -153,52 +171,28 @@ export default function BiometricLiveness({ onComplete, onBack }) {
               flipHorizontal: false,
             }
           );
-          console.log('✓ BlazeFace detector loaded via SupportedModels');
+          console.log('✓ BlazeFace detector loaded via SupportedModels fallback');
           modelLoaded = true;
-        } catch (err1) {
-          console.warn('SupportedModels approach failed:', err1.message || err1);
+        } catch (err) {
+          console.warn('BlazeFace initialization failed:', err.message || err);
         }
       }
 
-      if (!modelLoaded) {
-        const modelNames = ['blazeface', 'mediapipe-facemesh', 'facemesh'];
-        for (const modelName of modelNames) {
-          try {
-            console.log(`Attempting ${modelName} initialization...`);
-            detectorRef.current = await faceDetection.createDetector(modelName, {
+      if (!modelLoaded && faceDetection.SupportedModels?.MediaPipeFaceDetector) {
+        try {
+          console.log('Attempting SupportedModels.MediaPipeFaceDetector with tfjs runtime fallback...');
+          detectorRef.current = await faceDetection.createDetector(
+            faceDetection.SupportedModels.MediaPipeFaceDetector,
+            {
+              runtime: 'tfjs',
               maxFaces: 1,
               flipHorizontal: false,
-            });
-            console.log(`✓ ${modelName} detector loaded successfully`);
-            modelLoaded = true;
-            break;
-          } catch (err) {
-            console.warn(`${modelName} failed:`, err.message || err);
-          }
-        }
-      }
-
-      if (!modelLoaded) {
-        const vision = await loadMediaPipeTasksVision();
-        if (vision) {
-          try {
-            console.log('Attempting direct MediaPipe initialization...');
-            detectorRef.current = await vision.FaceDetection.createFromOptions(
-              vision.FilesetResolver.forVisionTasks(
-                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2/wasm'
-              ),
-              {
-                baseOptions: {
-                  modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_classifier/mobilenet_v2/float32/1/mobilenet_v2.tflite',
-                },
-                runningMode: 'VIDEO',
-              }
-            );
-            console.log('✓ Direct MediaPipe detector loaded');
-            modelLoaded = true;
-          } catch (err) {
-            console.warn('Direct MediaPipe failed:', err.message || err);
-          }
+            }
+          );
+          console.log('✓ MediaPipeFaceDetector loaded via tfjs runtime fallback');
+          modelLoaded = true;
+        } catch (err) {
+          console.warn('MediaPipeFaceDetector tfjs runtime fallback failed:', err.message || err);
         }
       }
 
