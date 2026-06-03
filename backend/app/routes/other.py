@@ -176,12 +176,21 @@ async def submit_verification(
     # Generate global request ID (e.g., VR-2026-05-31-ABC123)
     request_id = f"VR-{uid()[:8].upper()}"
     
+    id_front_url = data.id_front or data.document_url
+    if not id_front_url:
+        raise HTTPException(status_code=400, detail="Missing front ID image URL")
+    if not data.id_back or not data.selfie:
+        raise HTTPException(status_code=400, detail="Missing ID back or selfie image URL")
+
     doc = {
         "id": uid(),
         "request_id": request_id,  # Global request ID for tracking
         "user_id": current["id"],
-        "document_url": data.document_url,
+        "id_front": id_front_url,
+        "document_url": id_front_url,
         "document_type": data.document_type,
+        "id_back": data.id_back,
+        "selfie": data.selfie,
         "note": data.note or "",
         "status": "pending",
         "current_stage": "identity_check",  # Global stage: identity_check → face_match → under_review → final_decision

@@ -68,11 +68,12 @@ export default function VerificationRequest({ onClose }) {
       const selfieUrl = await uploadFile(selfie);
       
       const result = await verificationApi.submit({
+        id_front: idFrontUrl,
         document_url: idFrontUrl,
         document_type: 'id_front',
-        note,
         id_back: idBackUrl,
         selfie: selfieUrl,
+        note,
       });
       setRequestId(result.request_id);
       setStep(5);

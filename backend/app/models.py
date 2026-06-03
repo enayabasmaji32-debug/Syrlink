@@ -166,8 +166,11 @@ class ConversationIn(BaseModel):
 # ===========================================================================
 
 class VerificationRequestIn(BaseModel):
-    document_url: str
-    document_type: Literal["id", "experience", "education", "other"]
+    id_front: Optional[str] = None
+    document_url: Optional[str] = None
+    document_type: Literal["id_front", "id", "experience", "education", "other"]
+    id_back: Optional[str] = None
+    selfie: Optional[str] = None
     note: Optional[str] = ""
 
 

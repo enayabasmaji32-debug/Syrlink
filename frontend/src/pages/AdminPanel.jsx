@@ -241,13 +241,44 @@ export default function AdminPanel() {
                 </div>
 
                 {/* Document Info */}
-                <div className="bg-gray-50 rounded p-3 mb-3 text-xs space-y-1">
-                  <p><strong>Document Type:</strong> {r.document_type}</p>
-                  {r.note && <p><strong>Note:</strong> {r.note}</p>}
-                  <p className="text-gray-600">Submitted: {new Date(r.created_at).toLocaleDateString()}</p>
-                  <a href={r.document_url} target="_blank" rel="noreferrer" className="text-[#0a66c2] hover:underline">
-                    View document →
-                  </a>
+                <div className="bg-gray-50 rounded p-3 mb-3 text-xs space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="bg-white rounded-xl border border-gray-200 p-3">
+                      <p className="text-gray-700 text-xs font-semibold mb-2">ID - Front</p>
+                      {r.id_front || r.document_url ? (
+                        <a href={r.id_front || r.document_url} target="_blank" rel="noreferrer" className="block text-[#0a66c2] hover:underline text-xs font-semibold">
+                          View front image
+                        </a>
+                      ) : (
+                        <p className="text-gray-500 text-[11px]">Not provided</p>
+                      )}
+                    </div>
+                    <div className="bg-white rounded-xl border border-gray-200 p-3">
+                      <p className="text-gray-700 text-xs font-semibold mb-2">ID - Back</p>
+                      {r.id_back ? (
+                        <a href={r.id_back} target="_blank" rel="noreferrer" className="block text-[#0a66c2] hover:underline text-xs font-semibold">
+                          View back image
+                        </a>
+                      ) : (
+                        <p className="text-gray-500 text-[11px]">Not provided</p>
+                      )}
+                    </div>
+                    <div className="bg-white rounded-xl border border-gray-200 p-3">
+                      <p className="text-gray-700 text-xs font-semibold mb-2">Live Selfie</p>
+                      {r.selfie ? (
+                        <a href={r.selfie} target="_blank" rel="noreferrer" className="block text-[#0a66c2] hover:underline text-xs font-semibold">
+                          View selfie
+                        </a>
+                      ) : (
+                        <p className="text-gray-500 text-[11px]">Not provided</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    <p><strong>Requested Type:</strong> {r.document_type}</p>
+                    {r.note && <p><strong>Note:</strong> {r.note}</p>}
+                    <p>Submitted: {new Date(r.created_at).toLocaleDateString()}</p>
+                  </div>
                 </div>
 
                 {/* Stages Progress */}

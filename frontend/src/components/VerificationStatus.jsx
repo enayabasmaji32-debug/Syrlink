@@ -160,7 +160,7 @@ export default function VerificationStatus() {
         </div>
 
         {/* Document Information */}
-        {request.document_url && (
+        {(request.id_front || request.document_url) && (
           <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200">
             <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
               <FileText className="w-4 h-4 text-gray-700" />
@@ -175,7 +175,7 @@ export default function VerificationStatus() {
                    request.document_type === 'education' ? 'Diploma' :
                    'Document'}
                 </span>
-                <a href={request.document_url} target="_blank" rel="noreferrer" className="text-[#0a66c2] hover:text-[#005ba1] font-semibold flex items-center gap-1 transition">
+                <a href={request.id_front || request.document_url} target="_blank" rel="noreferrer" className="text-[#0a66c2] hover:text-[#005ba1] font-semibold flex items-center gap-1 transition">
                   View <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
