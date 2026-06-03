@@ -30,13 +30,39 @@ export default function BiometricLiveness({ onComplete, onBack }) {
     const initializeDetector = async () => {
       try {
         await tf.ready();
-        const model = faceDetection.SupportedModels.BlazeFace;
-        detectorRef.current = await faceDetection.createDetector(model);
+        console.log('TensorFlow.js ready');
+        
+        // Try to load BlazeFace model
+        try {
+          detectorRef.current = await faceDetection.createDetector(
+            'blazeface',
+            {
+              maxFaces: 1,
+              flipHorizontal: false
+            }
+          );
+          console.log('BlazeFace detector loaded successfully');
+        } catch (blazeFaceError) {
+          console.warn('BlazeFace failed, trying with SupportedModels:', blazeFaceError);
+          
+          // Fallback to SupportedModels
+          if (faceDetection.SupportedModels && faceDetection.SupportedModels.BlazeFace) {
+            detectorRef.current = await faceDetection.createDetector(
+              faceDetection.SupportedModels.BlazeFace,
+              { maxFaces: 1, flipHorizontal: false }
+            );
+            console.log('Detector loaded via SupportedModels');
+          } else {
+            throw new Error('BlazeFace model not available');
+          }
+        }
+        
         await startCamera();
       } catch (e) {
         console.error('Failed to initialize detector:', e);
+        console.error('Full error:', e);
         setStatus('error');
-        toast.error('Failed to load face detection model');
+        toast.error(`Face detection error: ${e.message}`);
       }
     };
     initializeDetector();
