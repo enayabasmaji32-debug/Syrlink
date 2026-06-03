@@ -4,12 +4,48 @@ import * as faceDetection from '@tensorflow-models/face-detection';
 import { Camera, AlertCircle, CheckCircle2, Loader2, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Load MediaPipe dynamically
-if (typeof window !== 'undefined' && !window.mediapipeTasksVision) {
-  const script = document.createElement('script');
-  script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2';
-  document.head.appendChild(script);
-}
+const isSecureContext = () => {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  return window.location.protocol === 'https:' || hostname === 'localhost' || hostname === '127.0.0.1';
+};
+
+const getCameraErrorMessage = (error) => {
+  if (!error) return 'Camera access failed. Please try again.';
+  if (error.name === 'NotAllowedError') {
+    return 'Camera permission denied. Please allow access in the browser prompt and retry.';
+  }
+  if (error.name === 'NotFoundError') {
+    return 'No camera device was found. Please connect a camera and retry.';
+  }
+  if (error.name === 'AbortError') {
+    return 'Camera request was aborted. Please retry.';
+  }
+  if (error.name === 'OverconstrainedError') {
+    return 'Your camera does not support the required settings. Try a different camera or device.';
+  }
+  if (error.name === 'TimeoutError') {
+    return 'Camera request timed out. Please retry.';
+  }
+  if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+    return 'Unable to start the camera. Another app may be using it.';
+  }
+  return error.message || 'Could not access camera. Please retry or use a supported device.';
+};
+
+const loadMediaPipeTasksVision = async () => {
+  if (typeof window === 'undefined' || window.mediapipeTasksVision) return window.mediapipeTasksVision;
+
+  try {
+    const vision = await import(/* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2');
+    window.mediapipeTasksVision = vision;
+    console.log('MediaPipe Tasks Vision module loaded');
+    return vision;
+  } catch (err) {
+    console.warn('Failed to dynamically import MediaPipe Tasks Vision module:', err);
+    return null;
+  }
+};
 
 export default function BiometricLiveness({ onComplete, onBack }) {
   const videoRef = useRef(null);
@@ -17,7 +53,9 @@ export default function BiometricLiveness({ onComplete, onBack }) {
   const streamRef = useRef(null);
   const detectorRef = useRef(null);
 
-  const [status, setStatus] = useState('initializing'); // initializing, waiting, detecting, success, error
+  const [status, setStatus] = useState('initializing'); // initializing, requesting, waiting, success, error
+  const [cameraStatus, setCameraStatus] = useState('pending'); // pending, requesting, granted, denied
+  const [cameraError, setCameraError] = useState('');
   const [currentMotion, setCurrentMotion] = useState(0);
   const [faceDetected, setFaceDetected] = useState(false);
   const [livenessScore, setLivenessScore] = useState(0);
@@ -32,93 +70,158 @@ export default function BiometricLiveness({ onComplete, onBack }) {
     { id: 5, name: 'Move Away', instruction: 'ابعد وجهك', icon: '📏' },
   ];
 
-  // Initialize face detection model
-  useEffect(() => {
-    const initializeDetector = async () => {
-      try {
-        await tf.ready();
-        console.log('TensorFlow.js ready');
-        console.log('Available models:', faceDetection.SupportedModels);
-        
-        // Try multiple initialization strategies
-        let modelLoaded = false;
-        
-        // Strategy 1: Try with SupportedModels enum (preferred method)
-        if (faceDetection.SupportedModels?.BlazeFace) {
-          try {
-            console.log('Attempting SupportedModels.BlazeFace initialization...');
-            detectorRef.current = await faceDetection.createDetector(
-              faceDetection.SupportedModels.BlazeFace,
-              { 
-                maxFaces: 1,
-                flipHorizontal: false
-              }
-            );
-            console.log('✓ BlazeFace detector loaded via SupportedModels');
-            modelLoaded = true;
-          } catch (err1) {
-            console.warn('SupportedModels approach failed:', err1.message);
-          }
-        }
-        
-        // Strategy 2: Try alternative model names
-        if (!modelLoaded) {
-          const modelNames = ['blazeface', 'mediapipe-facemesh', 'facemesh'];
-          for (const modelName of modelNames) {
-            try {
-              console.log(`Attempting ${modelName} initialization...`);
-              detectorRef.current = await faceDetection.createDetector(modelName, {
-                maxFaces: 1,
-                flipHorizontal: false
-              });
-              console.log(`✓ ${modelName} detector loaded successfully`);
-              modelLoaded = true;
-              break;
-            } catch (err) {
-              console.warn(`${modelName} failed:`, err.message);
+  const requestCameraAccess = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('Camera API is not available in this browser.');
+    }
+
+    setCameraStatus('requesting');
+    setStatus('requesting');
+    setCameraError('');
+
+    const constraints = {
+      video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false,
+    };
+
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    streamRef.current = stream;
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.onloadedmetadata = () => {
+        setCameraStatus('granted');
+        setStatus('waiting');
+      };
+    }
+  };
+
+  const startCamera = async () => {
+    try {
+      await requestCameraAccess();
+    } catch (e) {
+      const message = getCameraErrorMessage(e);
+      console.error('Camera access failed:', e);
+      setCameraError(message);
+      setCameraStatus('denied');
+      setStatus('error');
+      toast.error(message);
+    }
+  };
+
+  const retryCameraPermission = async () => {
+    setCameraError('');
+    setStatus('initializing');
+    setCameraStatus('pending');
+    await initializeDetector();
+  };
+
+  const initializeDetector = async () => {
+    if (typeof window === 'undefined') return;
+
+    if (window.self !== window.top) {
+      const errorMessage = 'Verification must run in the main browser window, not inside an iframe.';
+      console.error(errorMessage);
+      setCameraError(errorMessage);
+      setCameraStatus('denied');
+      setStatus('error');
+      return;
+    }
+
+    if (!isSecureContext()) {
+      const errorMessage = 'Camera access requires a secure connection (HTTPS). Please open the site over HTTPS.';
+      console.error(errorMessage);
+      setCameraError(errorMessage);
+      setCameraStatus('denied');
+      setStatus('error');
+      return;
+    }
+
+    try {
+      await tf.ready();
+      console.log('TensorFlow.js ready');
+      console.log('Available models:', faceDetection.SupportedModels);
+
+      let modelLoaded = false;
+
+      if (faceDetection.SupportedModels?.BlazeFace) {
+        try {
+          console.log('Attempting SupportedModels.BlazeFace initialization...');
+          detectorRef.current = await faceDetection.createDetector(
+            faceDetection.SupportedModels.BlazeFace,
+            {
+              maxFaces: 1,
+              flipHorizontal: false,
             }
+          );
+          console.log('✓ BlazeFace detector loaded via SupportedModels');
+          modelLoaded = true;
+        } catch (err1) {
+          console.warn('SupportedModels approach failed:', err1.message || err1);
+        }
+      }
+
+      if (!modelLoaded) {
+        const modelNames = ['blazeface', 'mediapipe-facemesh', 'facemesh'];
+        for (const modelName of modelNames) {
+          try {
+            console.log(`Attempting ${modelName} initialization...`);
+            detectorRef.current = await faceDetection.createDetector(modelName, {
+              maxFaces: 1,
+              flipHorizontal: false,
+            });
+            console.log(`✓ ${modelName} detector loaded successfully`);
+            modelLoaded = true;
+            break;
+          } catch (err) {
+            console.warn(`${modelName} failed:`, err.message || err);
           }
         }
-        
-        // Strategy 3: Try direct MediaPipe loading
-        if (!modelLoaded && window.mediapipeTasksVision) {
+      }
+
+      if (!modelLoaded) {
+        const vision = await loadMediaPipeTasksVision();
+        if (vision) {
           try {
             console.log('Attempting direct MediaPipe initialization...');
-            // Use mediapipe directly
-            const vision = window.mediapipeTasksVision;
             detectorRef.current = await vision.FaceDetection.createFromOptions(
               vision.FilesetResolver.forVisionTasks(
                 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2/wasm'
               ),
               {
                 baseOptions: {
-                  modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_classifier/mobilenet_v2/float32/1/mobilenet_v2.tflite'
+                  modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_classifier/mobilenet_v2/float32/1/mobilenet_v2.tflite',
                 },
-                runningMode: 'VIDEO'
+                runningMode: 'VIDEO',
               }
             );
             console.log('✓ Direct MediaPipe detector loaded');
             modelLoaded = true;
           } catch (err) {
-            console.warn('Direct MediaPipe failed:', err.message);
+            console.warn('Direct MediaPipe failed:', err.message || err);
           }
         }
-        
-        if (!modelLoaded) {
-          throw new Error('No face detection model could be initialized');
-        }
-        
-        await startCamera();
-      } catch (e) {
-        console.error('Failed to initialize detector:', e);
-        setStatus('error');
-        toast.error(`Face detection error: ${e.message}`);
       }
-    };
+
+      if (!modelLoaded) {
+        throw new Error('No face detection model could be initialized');
+      }
+
+      await startCamera();
+    } catch (e) {
+      const message = getCameraErrorMessage(e);
+      console.error('Failed to initialize detector:', e);
+      setCameraError(message);
+      setCameraStatus('denied');
+      setStatus('error');
+      toast.error(message);
+    }
+  };
+
+  useEffect(() => {
     initializeDetector();
     return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   }, []);
@@ -129,28 +232,6 @@ export default function BiometricLiveness({ onComplete, onBack }) {
       detectMotion();
     }
   }, [status, currentMotion]);
-
-  // Start camera
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          setStatus('waiting');
-          detectMotion();
-        };
-      }
-    } catch (e) {
-      console.error('Camera access denied:', e);
-      setStatus('error');
-      toast.error('Camera access required for verification');
-    }
-  };
 
   // Detect motion and liveness
   const detectMotion = async () => {
@@ -325,32 +406,42 @@ export default function BiometricLiveness({ onComplete, onBack }) {
 
         {/* Status Overlay */}
         <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-          <div className="text-center">
-            {status === 'initializing' && (
+          <div className="text-center px-4">
+            {(status === 'initializing' || status === 'requesting') && (
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-                <p className="text-white text-sm">Loading biometric detection...</p>
+                <p className="text-white text-sm">يتم طلب إذن الكاميرا الآن...</p>
+                <p className="text-gray-200 text-xs">الرجاء السماح بالكاميرا في نافذة المتصفح لتفعيل التحقق.</p>
               </div>
             )}
 
-            {status === 'waiting' && !faceDetected && (
+            {status === 'waiting' && !faceDetected && cameraStatus === 'granted' && (
               <div className="flex flex-col items-center gap-3">
                 <Camera className="w-8 h-8 text-yellow-400" />
-                <p className="text-white text-sm">Position your face in the camera</p>
+                <p className="text-white text-sm">حرك وجهك إلى داخل الكاميرا</p>
+                <p className="text-gray-200 text-xs">ستبدأ التعليمات بعد اكتشاف الوجه.</p>
               </div>
             )}
 
             {status === 'success' && (
               <div className="flex flex-col items-center gap-3">
                 <CheckCircle2 className="w-8 h-8 text-green-400 animate-bounce" />
-                <p className="text-white text-sm">Verification Complete!</p>
+                <p className="text-white text-sm">اكتمل التحقق بنجاح!</p>
               </div>
             )}
 
             {status === 'error' && (
               <div className="flex flex-col items-center gap-3">
                 <AlertCircle className="w-8 h-8 text-red-400" />
-                <p className="text-white text-sm">Error: Could not access camera</p>
+                <p className="text-white text-sm">{cameraError || 'تعذر الوصول إلى الكاميرا. حاول مرة أخرى.'}</p>
+                {cameraStatus === 'denied' && (
+                  <button
+                    onClick={retryCameraPermission}
+                    className="mt-3 inline-flex items-center justify-center rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/20 hover:bg-white/20 transition"
+                  >
+                    أعد طلب إذن الكاميرا
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -424,7 +515,7 @@ export default function BiometricLiveness({ onComplete, onBack }) {
             className="flex-1 bg-gradient-to-r from-[#0a66c2] to-[#005ba1] hover:shadow-lg text-white font-semibold rounded-full py-3 flex items-center justify-center gap-2 transition"
           >
             <RotateCw className="w-4 h-4" />
-            Try Again
+            حاول مرة أخرى
           </button>
         )}
       </div>
