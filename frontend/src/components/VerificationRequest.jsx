@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { verificationApi, uploadApi } from '../api';
 import { ShieldCheck, Upload, CheckCircle2, ArrowRight, Lock, Camera, FileText, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import BiometricLiveness from './BiometricLiveness';
 import {
   Dialog,
   DialogContent,
@@ -290,8 +291,15 @@ export default function VerificationRequest({ onClose }) {
     );
   }
 
-  // ===== STEP 3: Live Selfie =====
+  // ===== STEP 3: Biometric Liveness Test =====
   if (step === 3) {
+    const handleLivenessComplete = (file) => {
+      setSelfie(file);
+      setSelfiePreview(URL.createObjectURL(file));
+      toast.success('✓ Biometric liveness verification complete!');
+      setStep(4);
+    };
+
     return (
       <Dialog key="step-3-dialog" open={true} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -312,74 +320,10 @@ export default function VerificationRequest({ onClose }) {
 
           {renderProgressBar()}
 
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Live Selfie Verification</h3>
-              <p className="text-sm text-gray-600">Take a clear selfie showing your face. Must be taken now (not from gallery)</p>
-            </div>
-
-            <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-4">
-              <p className="text-sm text-orange-800"><Eye className="w-4 h-4 inline mr-2" /><strong>Liveness Check:</strong> Please look directly at the camera and blink naturally</p>
-            </div>
-
-            <div className="relative">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={(e) => handleFileChange(e, 'selfie')}
-                id="selfie-upload"
-                className="hidden"
-              />
-              <label
-                htmlFor="selfie-upload"
-                className="flex flex-col items-center justify-center border-2 border-dashed border-[#0a66c2] rounded-xl p-10 hover:bg-gradient-to-b hover:from-blue-50 hover:to-transparent cursor-pointer transition bg-gradient-to-b from-blue-50 to-transparent"
-              >
-                <Camera className="w-12 h-12 text-[#0a66c2] mb-3" />
-                <p className="text-sm font-bold text-gray-900">Take a Selfie</p>
-                <p className="text-xs text-gray-600 mt-1">Click to open camera (up to 10MB)</p>
-              </label>
-            </div>
-
-            {selfiePreview && (
-              <div className="border-2 border-green-200 bg-green-50 rounded-xl p-4 animate-pulse">
-                <div className="flex items-center gap-2 mb-3">
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  <p className="text-sm font-semibold text-green-800">✓ Selfie Captured Successfully</p>
-                </div>
-                <img 
-                  src={selfiePreview} 
-                  alt="Selfie Preview" 
-                  className="max-h-40 rounded-lg w-full object-cover border border-green-300" 
-                  onLoad={() => console.log('[selfie] Image loaded in DOM')}
-                  onError={(e) => console.error('[selfie] Image failed to load:', e)}
-                />
-              </div>
-            )}
-            
-            {!selfiePreview && (
-              <div className="text-center py-4 text-gray-500 text-sm">
-                <p>Waiting for selfie capture...</p>
-              </div>
-            )}
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-xs text-blue-800"><Lock className="w-4 h-4 inline mr-2" /><strong>Your data is encrypted and secure</strong></p>
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={() => setStep(2)} className="flex-1 border-2 border-gray-300 text-gray-700 font-semibold rounded-full py-3 hover:bg-gray-100 transition">
-                Back
-              </button>
-              <button
-                onClick={() => selfie && setStep(4)}
-                disabled={!selfie}
-                className="flex-1 bg-gradient-to-r from-[#0a66c2] to-[#005ba1] hover:shadow-lg disabled:opacity-50 text-white font-semibold rounded-full py-3 flex items-center justify-center gap-2 transition"
-              >
-                Continue <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+          <BiometricLiveness 
+            onComplete={handleLivenessComplete}
+            onBack={() => setStep(2)}
+          />
         </DialogContent>
       </Dialog>
     );
