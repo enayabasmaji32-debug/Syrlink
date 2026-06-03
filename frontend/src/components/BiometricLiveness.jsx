@@ -1,529 +1,442 @@
-import React, { useRef, useEffect, useState } from 'react';
-import * as tf from '@tensorflow/tfjs';
-import * as faceDetection from '@tensorflow-models/face-detection';
-import { Camera, AlertCircle, CheckCircle2, Loader2, RotateCw } from 'lucide-react';
-import { toast } from 'sonner';
+import React, { useEffect, useRef, useState, useCallback } from 'react'
+import * as tf from '@tensorflow/tfjs'
+import * as faceDetection from '@tensorflow-models/face-detection'
+import { Camera, AlertCircle, CheckCircle2, Loader2, RotateCw } from 'lucide-react'
+import { toast } from 'sonner'
 
 const isSecureContext = () => {
-  if (typeof window === 'undefined') return false;
-  const hostname = window.location.hostname;
-  return window.location.protocol === 'https:' || hostname === 'localhost' || hostname === '127.0.0.1';
-};
+  if (typeof window === 'undefined') return false
+  const hostname = window.location.hostname
+  return window.location.protocol === 'https:' || hostname === 'localhost' || hostname === '127.0.0.1'
+}
 
 const getCameraErrorMessage = (error) => {
-  if (!error) return 'Camera access failed. Please try again.';
+  if (!error) return 'Camera access failed. Please try again.'
   if (error.name === 'NotAllowedError') {
-    return 'Camera permission denied. Please allow access in the browser prompt and retry.';
+    return 'Camera permission denied. Please allow access in the browser prompt and retry.'
   }
   if (error.name === 'NotFoundError') {
-    return 'No camera device was found. Please connect a camera and retry.';
+    return 'No camera device was found. Please connect a camera and retry.'
   }
   if (error.name === 'AbortError') {
-    return 'Camera request was aborted. Please retry.';
+    return 'Camera request was aborted. Please retry.'
   }
   if (error.name === 'OverconstrainedError') {
-    return 'Your camera does not support the required settings. Try a different camera or device.';
+    return 'Your camera does not support the required settings. Try a different camera or device.'
   }
   if (error.name === 'TimeoutError') {
-    return 'Camera request timed out. Please retry.';
+    return 'Camera request timed out. Please retry.'
   }
   if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
-    return 'Unable to start the camera. Another app may be using it.';
+    return 'Unable to start the camera. Another app may be using it.'
   }
-  return error.message || 'Could not access camera. Please retry or use a supported device.';
-};
+  return error.message || 'Could not access camera. Please retry or use a supported device.'
+}
 
-const loadMediaPipeTasksVision = async () => {
-  if (typeof window === 'undefined' || window.mediapipeTasksVision) return window.mediapipeTasksVision;
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
-  try {
-    const vision = await import(/* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2');
-    window.mediapipeTasksVision = vision;
-    console.log('MediaPipe Tasks Vision module loaded');
-    return vision;
-  } catch (err) {
-    console.warn('Failed to dynamically import MediaPipe Tasks Vision module:', err);
-    return null;
+const distance = (a, b) => {
+  if (!a || !b) return 0
+  const dx = (a.x ?? a[0] ?? 0) - (b.x ?? b[0] ?? 0)
+  const dy = (a.y ?? a[1] ?? 0) - (b.y ?? b[1] ?? 0)
+  return Math.sqrt(dx * dx + dy * dy)
+}
+
+const getPoint = (keypoints, name) => {
+  if (!Array.isArray(keypoints)) return null
+  return keypoints.find((point) => point?.name === name) || null
+}
+
+const calculateHeadYaw = (keypoints, boundingBox) => {
+  const leftEye = getPoint(keypoints, 'left_eye')
+  const rightEye = getPoint(keypoints, 'right_eye')
+  const nose = getPoint(keypoints, 'nose_tip')
+  if (!leftEye || !rightEye || !nose || !boundingBox) return 0
+
+  const eyeCenterX = (leftEye.x + rightEye.x) / 2
+  const noseX = nose.x
+  const faceWidth = Math.max(1, Math.abs(rightEye.x - leftEye.x))
+  const normalized = (noseX - eyeCenterX) / faceWidth
+  return clamp(normalized * 90, -45, 45)
+}
+
+const calculateMouthOpenness = (keypoints, boundingBox) => {
+  const leftMouth = getPoint(keypoints, 'mouth_left')
+  const rightMouth = getPoint(keypoints, 'mouth_right')
+  if (leftMouth && rightMouth && boundingBox) {
+    const mouthWidth = distance(leftMouth, rightMouth)
+    const boxWidth = Math.max(1, boundingBox.width)
+    return mouthWidth / boxWidth
   }
-};
+  return 0
+}
+
+const calculateEyeScore = (keypoints) => {
+  const leftEye = getPoint(keypoints, 'left_eye')
+  const rightEye = getPoint(keypoints, 'right_eye')
+  return {
+    left: leftEye?.score ?? 1,
+    right: rightEye?.score ?? 1,
+  }
+}
+
+const formatPercent = (value) => `${Math.round(value)}%`
 
 export default function BiometricLiveness({ onComplete, onBack }) {
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const streamRef = useRef(null);
-  const detectorRef = useRef(null);
+  const videoRef = useRef(null)
+  const canvasRef = useRef(null)
+  const detectorRef = useRef(null)
+  const streamRef = useRef(null)
+  const rafRef = useRef(null)
+  const motionHoldRef = useRef(0)
+  const blinkDetectedRef = useRef(false)
+  const mouthDetectedRef = useRef(false)
+  const lastFaceTimeRef = useRef(Date.now())
 
-  const [status, setStatus] = useState('initializing'); // initializing, requesting, waiting, success, error
-  const [cameraStatus, setCameraStatus] = useState('pending'); // pending, requesting, granted, denied
-  const [cameraError, setCameraError] = useState('');
-  const [currentMotion, setCurrentMotion] = useState(0);
-  const [faceDetected, setFaceDetected] = useState(false);
-  const [livenessScore, setLivenessScore] = useState(0);
-  const [capturedImage, setCapturedImage] = useState(null);
+  const [status, setStatus] = useState('initializing')
+  const [cameraError, setCameraError] = useState('')
+  const [faceDetected, setFaceDetected] = useState(false)
+  const [currentMotion, setCurrentMotion] = useState(0)
+  const [motionProgress, setMotionProgress] = useState(0)
+  const [predictionInfo, setPredictionInfo] = useState({ yaw: 0, mouth: 0, eyeScore: 1 })
 
   const motions = [
-    { id: 0, name: 'Turn Head Right', instruction: 'لف رأسك لليمين', icon: '→' },
-    { id: 1, name: 'Turn Head Left', instruction: 'لف رأسك لليسار', icon: '←' },
-    { id: 2, name: 'Blink Eyes', instruction: 'ارمش بعينيك', icon: '👁️' },
-    { id: 3, name: 'Open Mouth', instruction: 'افتح فمك', icon: '😮' },
-    { id: 4, name: 'Move Close', instruction: 'قرّب وجهك', icon: '📍' },
-    { id: 5, name: 'Move Away', instruction: 'ابعد وجهك', icon: '📏' },
-  ];
+    { id: 0, title: 'Turn Head Right', hint: 'لف رأسك لليمين حتى ترى النقطة الزرقاء', icon: '→' },
+    { id: 1, title: 'Turn Head Left', hint: 'لف رأسك لليسار حتى ترى النقطة الزرقاء', icon: '←' },
+    { id: 2, title: 'Blink Eyes', hint: 'أغمض عينيك ثم افتحهما بوضوح', icon: '👁️' },
+    { id: 3, title: 'Open Mouth', hint: 'افتح فمك قليلاً لتأكيد الحياة', icon: '🗣️' },
+  ]
 
-  const requestCameraAccess = async () => {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      throw new Error('Camera API is not available in this browser.');
+  const stopVideo = useCallback(() => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+    if (detectorRef.current) {
+      detectorRef.current.dispose?.()
+      detectorRef.current = null
+    }
+  }, [])
+
+  const captureSelfie = async () => {
+    const video = videoRef.current
+    if (!video) return null
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth || 640
+    canvas.height = video.videoHeight || 480
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const file = new File([blob], 'selfie.png', { type: 'image/png' })
+          resolve(file)
+        } else {
+          resolve(null)
+        }
+      }, 'image/png')
+    })
+  }
+
+  const markMotionComplete = useCallback(async () => {
+    const next = currentMotion + 1
+    setMotionProgress(0)
+    motionHoldRef.current = 0
+    if (next >= motions.length) {
+      setStatus('complete')
+      const selfieFile = await captureSelfie()
+      if (selfieFile) {
+        onComplete(selfieFile)
+      } else {
+        toast.error('Unable to capture selfie. Please try again.')
+      }
+      return
+    }
+    setCurrentMotion(next)
+  }, [currentMotion, motions.length, onComplete])
+
+  const drawOverlay = (prediction) => {
+    const canvas = canvasRef.current
+    const video = videoRef.current
+    if (!canvas || !video) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    if (!prediction) return
+
+    const box = prediction.boundingBox
+    if (box) {
+      ctx.strokeStyle = '#0a66c2'
+      ctx.lineWidth = 3
+      ctx.strokeRect(box.xMin, box.yMin, box.width, box.height)
     }
 
-    setCameraStatus('requesting');
-    setStatus('requesting');
-    setCameraError('');
+    const keypoints = prediction.keypoints || []
+    ctx.fillStyle = '#0a66c2'
+    keypoints.forEach((keypoint) => {
+      const x = keypoint.x ?? keypoint[0]
+      const y = keypoint.y ?? keypoint[1]
+      if (typeof x === 'number' && typeof y === 'number') {
+        ctx.beginPath()
+        ctx.arc(x, y, 4, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    })
+  }
 
-    const constraints = {
-      video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: false,
-    };
-
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    streamRef.current = stream;
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.onloadedmetadata = () => {
-        setCameraStatus('granted');
-        setStatus('waiting');
-      };
+  const processDetection = useCallback(async () => {
+    const video = videoRef.current
+    const detector = detectorRef.current
+    if (!video || !detector) return
+    if (video.readyState < 2) {
+      rafRef.current = requestAnimationFrame(processDetection)
+      return
     }
-  };
+
+    try {
+      const predictions = await detector.estimateFaces(video, { flipHorizontal: true })
+      const prediction = predictions?.[0] || null
+      if (!prediction) {
+        setFaceDetected(false)
+        setPredictionInfo({ yaw: 0, mouth: 0, eyeScore: 1 })
+        motionHoldRef.current = 0
+        drawOverlay(null)
+        const elapsed = Date.now() - lastFaceTimeRef.current
+        if (elapsed > 3000) {
+          setStatus('no-face')
+        }
+        rafRef.current = requestAnimationFrame(processDetection)
+        return
+      }
+
+      setFaceDetected(true)
+      lastFaceTimeRef.current = Date.now()
+      setStatus('verifying')
+
+      const keypoints = prediction.keypoints || []
+      const yaw = calculateHeadYaw(keypoints, prediction.boundingBox)
+      const mouthRatio = calculateMouthOpenness(keypoints, prediction.boundingBox)
+      const eyeScore = calculateEyeScore(keypoints)
+      setPredictionInfo({ yaw, mouth: mouthRatio, eyeScore: Math.min(1, (eyeScore.left + eyeScore.right) / 2) })
+
+      drawOverlay(prediction)
+
+      const thresholdTargets = {
+        0: yaw > 15,
+        1: yaw < -15,
+        2: eyeScore.left < 0.45 && eyeScore.right < 0.45,
+        3: mouthRatio > 0.32,
+      }
+
+      const currentTarget = thresholdTargets[currentMotion]
+      if (currentTarget) {
+        motionHoldRef.current += 1
+        setMotionProgress(Math.min(100, (motionHoldRef.current / 12) * 100))
+      } else {
+        motionHoldRef.current = 0
+        setMotionProgress(0)
+      }
+
+      if (motionHoldRef.current >= 10) {
+        if (currentMotion === 2) {
+          blinkDetectedRef.current = true
+        }
+        if (currentMotion === 3) {
+          mouthDetectedRef.current = true
+        }
+        await markMotionComplete()
+      }
+    } catch (error) {
+      console.error('Biometric detection failed:', error)
+      setStatus('error')
+      toast.error('Face detection failed. Please try again.')
+    }
+
+    rafRef.current = requestAnimationFrame(processDetection)
+  }, [currentMotion, markMotionComplete])
 
   const startCamera = async () => {
-    try {
-      await requestCameraAccess();
-    } catch (e) {
-      const message = getCameraErrorMessage(e);
-      console.error('Camera access failed:', e);
-      setCameraError(message);
-      setCameraStatus('denied');
-      setStatus('error');
-      toast.error(message);
-    }
-  };
-
-  const retryCameraPermission = async () => {
-    setCameraError('');
-    setStatus('initializing');
-    setCameraStatus('pending');
-    await initializeDetector();
-  };
-
-  const initializeDetector = async () => {
-    if (typeof window === 'undefined') return;
-
-    if (window.self !== window.top) {
-      const errorMessage = 'Verification must run in the main browser window, not inside an iframe.';
-      console.error(errorMessage);
-      setCameraError(errorMessage);
-      setCameraStatus('denied');
-      setStatus('error');
-      return;
-    }
-
     if (!isSecureContext()) {
-      const errorMessage = 'Camera access requires a secure connection (HTTPS). Please open the site over HTTPS.';
-      console.error(errorMessage);
-      setCameraError(errorMessage);
-      setCameraStatus('denied');
-      setStatus('error');
-      return;
+      setCameraError('Camera access requires HTTPS or localhost.')
+      setStatus('error')
+      return
     }
 
     try {
-      await tf.ready();
-      console.log('TensorFlow.js ready');
-      console.log('Available models:', JSON.stringify(faceDetection.SupportedModels, null, 2));
-
-      let modelLoaded = false;
-
-      if (faceDetection.SupportedModels?.MediaPipeFaceDetector) {
-        try {
-          console.log('Attempting SupportedModels.MediaPipeFaceDetector initialization...');
-          detectorRef.current = await faceDetection.createDetector(
-            faceDetection.SupportedModels.MediaPipeFaceDetector,
-            {
-              runtime: 'mediapipe',
-              maxFaces: 1,
-              flipHorizontal: false,
-            }
-          );
-          console.log('✓ MediaPipeFaceDetector loaded via SupportedModels');
-          modelLoaded = true;
-        } catch (err) {
-          console.warn('MediaPipeFaceDetector initialization failed:', err.message || err);
-        }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      })
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
       }
-
-      if (!modelLoaded && faceDetection.SupportedModels?.BlazeFace) {
-        try {
-          console.log('Attempting SupportedModels.BlazeFace initialization as fallback...');
-          detectorRef.current = await faceDetection.createDetector(
-            faceDetection.SupportedModels.BlazeFace,
-            {
-              maxFaces: 1,
-              flipHorizontal: false,
-            }
-          );
-          console.log('✓ BlazeFace detector loaded via SupportedModels fallback');
-          modelLoaded = true;
-        } catch (err) {
-          console.warn('BlazeFace initialization failed:', err.message || err);
-        }
-      }
-
-      if (!modelLoaded && faceDetection.SupportedModels?.MediaPipeFaceDetector) {
-        try {
-          console.log('Attempting SupportedModels.MediaPipeFaceDetector with tfjs runtime fallback...');
-          detectorRef.current = await faceDetection.createDetector(
-            faceDetection.SupportedModels.MediaPipeFaceDetector,
-            {
-              runtime: 'tfjs',
-              maxFaces: 1,
-              flipHorizontal: false,
-            }
-          );
-          console.log('✓ MediaPipeFaceDetector loaded via tfjs runtime fallback');
-          modelLoaded = true;
-        } catch (err) {
-          console.warn('MediaPipeFaceDetector tfjs runtime fallback failed:', err.message || err);
-        }
-      }
-
-      if (!modelLoaded) {
-        throw new Error('No face detection model could be initialized');
-      }
-
-      await startCamera();
-    } catch (e) {
-      const message = getCameraErrorMessage(e);
-      console.error('Failed to initialize detector:', e);
-      setCameraError(message);
-      setCameraStatus('denied');
-      setStatus('error');
-      toast.error(message);
+    } catch (error) {
+      const message = getCameraErrorMessage(error)
+      setCameraError(message)
+      setStatus('error')
+      toast.error(message)
     }
-  };
+  }
+
+  const loadModel = useCallback(async () => {
+    try {
+      await tf.ready()
+      detectorRef.current = await faceDetection.createDetector(faceDetection.SupportedModels.MediaPipeFaceDetector, {
+        runtime: 'tfjs',
+        maxFaces: 1,
+        modelType: 'short',
+      })
+    } catch (error) {
+      console.error('Face detector load failed:', error)
+      setStatus('error')
+      toast.error('Could not load face detection model. Please refresh and retry.')
+    }
+  }, [])
 
   useEffect(() => {
-    initializeDetector();
+    let mounted = true
+
+    const init = async () => {
+      setStatus('initializing')
+      await loadModel()
+      if (!mounted) return
+      await startCamera()
+      if (!mounted) return
+      setStatus('ready')
+      rafRef.current = requestAnimationFrame(processDetection)
+    }
+
+    init()
+
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, []);
-
-  // Start detection loop
-  useEffect(() => {
-    if (status === 'waiting' && videoRef.current?.srcObject) {
-      detectMotion();
+      mounted = false
+      stopVideo()
     }
-  }, [status, currentMotion]);
-
-  // Detect motion and liveness
-  const detectMotion = async () => {
-    if (!videoRef.current || !detectorRef.current) return;
-
-    try {
-      const faces = await detectorRef.current.estimateFaces(videoRef.current);
-
-      if (faces.length === 0) {
-        setFaceDetected(false);
-        setTimeout(detectMotion, 100);
-        return;
-      }
-
-      setFaceDetected(true);
-      const face = faces[0];
-      const keypoints = face.landmarks;
-
-      // Calculate motion metrics
-      const metrics = calculateMotionMetrics(keypoints);
-      updateMotionProgress(metrics);
-
-      // Continue detection
-      if (status === 'waiting') {
-        setTimeout(detectMotion, 100);
-      }
-    } catch (e) {
-      console.error('Detection error:', e);
-      if (status === 'waiting') {
-        setTimeout(detectMotion, 100);
-      }
-    }
-  };
-
-  // Calculate motion metrics from face keypoints
-  const calculateMotionMetrics = (keypoints) => {
-    const leftEye = keypoints[0];
-    const rightEye = keypoints[1];
-    const mouth = keypoints[2];
-    const leftCheek = keypoints[3];
-    const rightCheek = keypoints[4];
-
-    const headTilt = Math.abs(rightEye[0] - leftEye[0]); // Head rotation
-    const eyeDistance = Math.hypot(rightEye[0] - leftEye[0], rightEye[1] - leftEye[1]);
-    const mouthOpenness = Math.abs(mouth[1] - (leftEye[1] + rightEye[1]) / 2);
-    const faceWidth = Math.abs(rightCheek[0] - leftCheek[0]);
-
-    return {
-      headTilt,
-      eyeDistance,
-      mouthOpenness,
-      faceWidth,
-    };
-  };
-
-  // Update motion progress based on current motion task
-  const updateMotionProgress = (metrics) => {
-    if (status !== 'waiting' || !faceDetected) return;
-
-    const motion = motions[currentMotion];
-    let detected = false;
-
-    switch (currentMotion) {
-      case 0: // Turn right
-        detected = metrics.headTilt > 150;
-        break;
-      case 1: // Turn left
-        detected = metrics.headTilt > 150;
-        break;
-      case 2: // Blink
-        detected = metrics.eyeDistance > 60 && Math.random() > 0.8;
-        break;
-      case 3: // Open mouth
-        detected = metrics.mouthOpenness > 40;
-        break;
-      case 4: // Move close
-        detected = metrics.faceWidth > 400;
-        break;
-      case 5: // Move away
-        detected = metrics.faceWidth < 250;
-        break;
-      default:
-        break;
-    }
-
-    if (detected) {
-      setLivenessScore(prev => {
-        const newScore = Math.min(100, prev + 5);
-        
-        // Check if motion is complete
-        if (newScore >= (currentMotion + 1) * 15) {
-          // Motion completed
-          if (currentMotion < motions.length - 1) {
-            // Move to next motion
-            setCurrentMotion(prev => prev + 1);
-            setLivenessScore(0);
-            toast.success(`✓ ${motion.name} detected!`);
-          } else {
-            // All motions completed - start final verification
-            completeVerification();
-          }
-        }
-        return newScore;
-      });
-    }
-  };
-
-  // Capture final image and complete verification
-  const completeVerification = async () => {
-    setStatus('success');
-    try {
-      const canvas = canvasRef.current;
-      if (!canvas || !videoRef.current) {
-        throw new Error('Canvas or video not available');
-      }
-      
-      canvas.width = videoRef.current.videoWidth || 1280;
-      canvas.height = videoRef.current.videoHeight || 720;
-      
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(videoRef.current, 0, 0);
-      
-      const imageData = canvas.toDataURL('image/jpeg', 0.95);
-      setCapturedImage(imageData);
-
-      // Convert to File object
-      const response = await fetch(imageData);
-      const blob = await response.blob();
-      const file = new File([blob], 'liveness-selfie.jpg', { type: 'image/jpeg' });
-
-      // Call onComplete with the file after delay
-      setTimeout(() => {
-        if (onComplete) {
-          onComplete(file);
-        }
-      }, 2000);
-    } catch (e) {
-      console.error('Failed to capture image:', e);
-      setStatus('error');
-      toast.error('Failed to capture verification image');
-    }
-  };
-
-  const resetTest = () => {
-    setCurrentMotion(0);
-    setLivenessScore(0);
-    setStatus('waiting');
-  };
+  }, [loadModel, processDetection, stopVideo])
 
   return (
     <div className="space-y-6">
-      {/* Status */}
-      <div className="text-center">
-        <h3 className="text-lg font-bold text-gray-900 mb-2">Biometric Liveness Test</h3>
-        <p className="text-sm text-gray-600">Complete the facial movements to verify you are human</p>
-      </div>
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">Biometric Liveness Check</h3>
+            <p className="text-sm text-slate-600">أكمل الحركات التالية أمام الكاميرا حتى يكتمل التحقق.</p>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
+            <Camera className="h-4 w-4" /> Live video
+          </div>
+        </div>
 
-      {/* Video Stream */}
-      <div className="relative bg-black rounded-xl overflow-hidden" style={{ aspectRatio: '4/3' }}>
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          className="w-full h-full object-cover"
-        />
-        <canvas
-          ref={canvasRef}
-          className="hidden"
-          width={1280}
-          height={720}
-        />
-
-        {/* Status Overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-          <div className="text-center px-4">
-            {(status === 'initializing' || status === 'requesting') && (
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-                <p className="text-white text-sm">يتم طلب إذن الكاميرا الآن...</p>
-                <p className="text-gray-200 text-xs">الرجاء السماح بالكاميرا في نافذة المتصفح لتفعيل التحقق.</p>
+        <div className="mt-5 grid gap-4 md:grid-cols-[1.4fr_0.6fr]">
+          <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-950/5">
+            <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
+            <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+            {status === 'initializing' && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60 text-white">
+                <Loader2 className="h-8 w-8 animate-spin" />
               </div>
             )}
-
-            {status === 'waiting' && !faceDetected && cameraStatus === 'granted' && (
-              <div className="flex flex-col items-center gap-3">
-                <Camera className="w-8 h-8 text-yellow-400" />
-                <p className="text-white text-sm">حرك وجهك إلى داخل الكاميرا</p>
-                <p className="text-gray-200 text-xs">ستبدأ التعليمات بعد اكتشاف الوجه.</p>
-              </div>
-            )}
-
-            {status === 'success' && (
-              <div className="flex flex-col items-center gap-3">
-                <CheckCircle2 className="w-8 h-8 text-green-400 animate-bounce" />
-                <p className="text-white text-sm">اكتمل التحقق بنجاح!</p>
-              </div>
-            )}
-
             {status === 'error' && (
-              <div className="flex flex-col items-center gap-3">
-                <AlertCircle className="w-8 h-8 text-red-400" />
-                <p className="text-white text-sm">{cameraError || 'تعذر الوصول إلى الكاميرا. حاول مرة أخرى.'}</p>
-                {cameraStatus === 'denied' && (
-                  <button
-                    onClick={retryCameraPermission}
-                    className="mt-3 inline-flex items-center justify-center rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/20 hover:bg-white/20 transition"
-                  >
-                    أعد طلب إذن الكاميرا
-                  </button>
-                )}
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/10 text-red-700 p-4 text-center">
+                <AlertCircle className="mb-2 h-8 w-8" />
+                <p>{cameraError || 'حدث خطأ أثناء الوصول إلى الكاميرا'}</p>
+              </div>
+            )}
+            {!faceDetected && status === 'verifying' && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60 text-white">
+                <p className="text-sm font-semibold">لم يتم اكتشاف الوجه بعد. تأكد من وضوح الإضاءة ووجه الكاميرا مباشرة.</p>
               </div>
             )}
           </div>
-        </div>
 
-        {/* Motion Instruction */}
-        {faceDetected && status === 'waiting' && (
-          <div className="absolute bottom-4 left-4 right-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-4">
-            <p className="text-2xl font-bold text-center mb-1">{motions[currentMotion].icon}</p>
-            <p className="text-sm font-semibold text-center">{motions[currentMotion].instruction}</p>
-            <p className="text-xs text-blue-100 text-center mt-2">Step {currentMotion + 1} of {motions.length}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Progress */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-gray-700">Motion Progress:</span>
-          <div className="flex gap-1 flex-1">
-            {motions.map((m, i) => (
-              <div
-                key={i}
-                className={`h-2 flex-1 rounded-full transition ${
-                  i < currentMotion
-                    ? 'bg-green-500'
-                    : i === currentMotion
-                      ? 'bg-gradient-to-r from-blue-500 to-blue-600'
-                      : 'bg-gray-300'
-                }`}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Current Motion Score */}
-        {faceDetected && status === 'waiting' && (
-          <div className="flex items-center gap-3">
-            <div className="flex-1 bg-gray-200 rounded-full h-3 overflow-hidden">
-              <div
-                className="bg-gradient-to-r from-blue-500 to-green-500 h-full transition-all duration-300"
-                style={{ width: `${livenessScore}%` }}
-              />
+          <div className="space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-3xl bg-white p-4 shadow-sm">
+              <p className="text-sm font-semibold text-slate-900">الخطوة الحالية</p>
+              <p className="mt-2 text-lg font-bold text-slate-900">{motions[currentMotion]?.title}</p>
+              <p className="mt-1 text-sm text-slate-600">{motions[currentMotion]?.hint}</p>
             </div>
-            <span className="text-xs font-bold text-gray-700 w-8 text-right">{livenessScore}%</span>
+
+            <div className="rounded-3xl bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between text-sm font-semibold text-slate-700">
+                <span>الحركة</span>
+                <span>{motionProgress ? formatPercent(motionProgress) : '0%'}</span>
+              </div>
+              <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-200">
+                <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" style={{ width: `${motionProgress}%` }} />
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-white p-4 shadow-sm space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <span>معلومات الكشف</span>
+              </div>
+              <div className="grid gap-2 text-sm text-slate-600">
+                <div className="flex justify-between">
+                  <span>زاوية الرأس</span>
+                  <span>{predictionInfo.yaw.toFixed(1)}°</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>فتح الفم</span>
+                  <span>{predictionInfo.mouth.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>ثقة العين</span>
+                  <span>{predictionInfo.eyeScore.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-white p-4 text-sm text-slate-600 shadow-sm">
+              <p className="font-semibold text-slate-800">تعليمات</p>
+              <ul className="mt-3 space-y-2 list-disc pl-5">
+                <li>اجلس أمام الكاميرا وزد الإضاءة إن لزم.</li>
+                <li>لا تغطي وجهك بيد أو نظارة داكنة.</li>
+                <li>انتظر حتى تُظهر الشريط الأخضر اكتمال الحركة.</li>
+                <li>عند الانتهاء، سيتم التقاط صورة سيلفي تلقائياً.</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  stopVideo()
+                  onBack()
+                }}
+                className="flex-1 rounded-full border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (status === 'ready' || status === 'no-face' || status === 'verifying') {
+                    setCurrentMotion(0)
+                    setMotionProgress(0)
+                    motionHoldRef.current = 0
+                    setStatus('ready')
+                    if (!rafRef.current) rafRef.current = requestAnimationFrame(processDetection)
+                  }
+                }}
+                className="flex-1 rounded-full bg-gradient-to-r from-[#0a66c2] to-[#005ba1] px-4 py-3 text-sm font-semibold text-white transition hover:shadow-lg"
+              >
+                Restart
+              </button>
+            </div>
           </div>
-        )}
-      </div>
-
-      {/* Face Detection Status */}
-      <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
-        faceDetected
-          ? 'bg-green-50 text-green-800 border border-green-200'
-          : 'bg-yellow-50 text-yellow-800 border border-yellow-200'
-      }`}>
-        <div className={`w-2 h-2 rounded-full ${faceDetected ? 'bg-green-600' : 'bg-yellow-600'}`} />
-        {faceDetected ? '✓ Face detected - Follow the instructions' : '⚠ Waiting for face detection...'}
-      </div>
-
-      {/* Actions */}
-      <div className="flex gap-3">
-        <button
-          onClick={onBack}
-          className="flex-1 border-2 border-gray-300 text-gray-700 font-semibold rounded-full py-3 hover:bg-gray-100 transition"
-        >
-          Cancel
-        </button>
-        {status === 'error' && (
-          <button
-            onClick={resetTest}
-            className="flex-1 bg-gradient-to-r from-[#0a66c2] to-[#005ba1] hover:shadow-lg text-white font-semibold rounded-full py-3 flex items-center justify-center gap-2 transition"
-          >
-            <RotateCw className="w-4 h-4" />
-            حاول مرة أخرى
-          </button>
-        )}
-      </div>
-
-      {/* Biometric Info */}
-      <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4 text-xs text-gray-700 border-l-4 border-blue-500">
-        <p className="font-bold mb-2">Security Info</p>
-        <ul className="space-y-1 text-gray-600">
-          <li>• This test verifies you are a real person</li>
-          <li>• Your biometric data is never stored</li>
-          <li>• All data is encrypted end-to-end</li>
-          <li>• No facial images are kept after verification</li>
-        </ul>
+        </div>
       </div>
     </div>
-  );
+  )
 }
