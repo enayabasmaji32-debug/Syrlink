@@ -3,7 +3,13 @@ import * as tf from '@tensorflow/tfjs';
 import * as faceDetection from '@tensorflow-models/face-detection';
 import { Camera, AlertCircle, CheckCircle2, Loader2, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
-import '@mediapipe/face_detection';
+
+// Load MediaPipe dynamically
+if (typeof window !== 'undefined' && !window.mediapipeTasksVision) {
+  const script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2';
+  document.head.appendChild(script);
+}
 
 export default function BiometricLiveness({ onComplete, onBack }) {
   const videoRef = useRef(null);
