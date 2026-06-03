@@ -440,6 +440,18 @@ export function AppProvider({ children }) {
       ? { ...c, thread: data.thread, unread: false } : c));
   };
 
+  const upsertConversation = useCallback((conversation) => {
+    setConversations((convs) => {
+      const existingIndex = convs.findIndex((c) => c.id === conversation.id);
+      if (existingIndex !== -1) {
+        const updated = [...convs];
+        updated[existingIndex] = { ...updated[existingIndex], ...conversation };
+        return updated;
+      }
+      return [...convs, conversation];
+    });
+  }, []);
+
   const markNotificationRead = async (id) => {
     setNotifications((all) => all.map((n) => n.id === id ? { ...n, read: true } : n));
     try {
@@ -479,7 +491,7 @@ export function AppProvider({ children }) {
     people, networkUsers, invitations, connections, pendingSent,
     sendConnect, acceptInvite, ignoreInvite,
     savedJobs, appliedJobs, toggleSaveJob, applyJob,
-    conversations, sendMessage, loadThread,
+    conversations, sendMessage, loadThread, upsertConversation,
     notifications, markNotificationRead, unreadNotifCount, unreadMsgCount,
     refreshAll,
     onlineUsers, isUserOnline,
@@ -488,7 +500,7 @@ export function AppProvider({ children }) {
   }), [
     user, authReady, posts, commentsByPost, ownedCompanies, activeCompany, people, networkUsers, invitations,
     connections, pendingSent, savedJobs, appliedJobs, conversations, notifications, language, createContentType,
-    onlineUsers
+    onlineUsers, upsertConversation
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
