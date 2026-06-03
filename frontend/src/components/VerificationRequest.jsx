@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from './ui/dialog';
 
 export default function VerificationRequest({ onClose }) {
@@ -131,6 +132,10 @@ export default function VerificationRequest({ onClose }) {
             </div>
           </DialogHeader>
 
+          <DialogDescription className="sr-only">
+            Step 1 of 5: Upload the front side of your ID document for verification
+          </DialogDescription>
+
           {renderProgressBar()}
 
           <div className="space-y-6">
@@ -220,6 +225,10 @@ export default function VerificationRequest({ onClose }) {
               </div>
             </div>
           </DialogHeader>
+
+          <DialogDescription className="sr-only">
+            Step 2 of 5: Upload the back side of your ID document for verification
+          </DialogDescription>
 
           {renderProgressBar()}
 
@@ -318,6 +327,10 @@ export default function VerificationRequest({ onClose }) {
             </div>
           </DialogHeader>
 
+          <DialogDescription className="sr-only">
+            Step 3 of 5: Complete biometric liveness detection with real-time face recognition
+          </DialogDescription>
+
           {renderProgressBar()}
 
           <BiometricLiveness 
@@ -348,6 +361,10 @@ export default function VerificationRequest({ onClose }) {
               </div>
             </div>
           </DialogHeader>
+
+          <DialogDescription className="sr-only">
+            Step 4 of 5: Review your uploaded documents and biometric data before submission
+          </DialogDescription>
 
           {renderProgressBar()}
 
@@ -432,6 +449,10 @@ export default function VerificationRequest({ onClose }) {
             </div>
           </div>
         </DialogHeader>
+
+        <DialogDescription className="sr-only">
+          Step 5 of 5: Your verification request has been submitted successfully
+        </DialogDescription>
 
         {renderProgressBar()}
 

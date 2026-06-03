@@ -3,6 +3,7 @@ import * as tf from '@tensorflow/tfjs';
 import * as faceDetection from '@tensorflow-models/face-detection';
 import { Camera, AlertCircle, CheckCircle2, Loader2, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
+import '@mediapipe/face_detection';
 
 export default function BiometricLiveness({ onComplete, onBack }) {
   const videoRef = useRef(null);
@@ -31,36 +32,79 @@ export default function BiometricLiveness({ onComplete, onBack }) {
       try {
         await tf.ready();
         console.log('TensorFlow.js ready');
+        console.log('Available models:', faceDetection.SupportedModels);
         
-        // Try to load BlazeFace model
-        try {
-          detectorRef.current = await faceDetection.createDetector(
-            'blazeface',
-            {
-              maxFaces: 1,
-              flipHorizontal: false
-            }
-          );
-          console.log('BlazeFace detector loaded successfully');
-        } catch (blazeFaceError) {
-          console.warn('BlazeFace failed, trying with SupportedModels:', blazeFaceError);
-          
-          // Fallback to SupportedModels
-          if (faceDetection.SupportedModels && faceDetection.SupportedModels.BlazeFace) {
+        // Try multiple initialization strategies
+        let modelLoaded = false;
+        
+        // Strategy 1: Try with SupportedModels enum (preferred method)
+        if (faceDetection.SupportedModels?.BlazeFace) {
+          try {
+            console.log('Attempting SupportedModels.BlazeFace initialization...');
             detectorRef.current = await faceDetection.createDetector(
               faceDetection.SupportedModels.BlazeFace,
-              { maxFaces: 1, flipHorizontal: false }
+              { 
+                maxFaces: 1,
+                flipHorizontal: false
+              }
             );
-            console.log('Detector loaded via SupportedModels');
-          } else {
-            throw new Error('BlazeFace model not available');
+            console.log('✓ BlazeFace detector loaded via SupportedModels');
+            modelLoaded = true;
+          } catch (err1) {
+            console.warn('SupportedModels approach failed:', err1.message);
           }
+        }
+        
+        // Strategy 2: Try alternative model names
+        if (!modelLoaded) {
+          const modelNames = ['blazeface', 'mediapipe-facemesh', 'facemesh'];
+          for (const modelName of modelNames) {
+            try {
+              console.log(`Attempting ${modelName} initialization...`);
+              detectorRef.current = await faceDetection.createDetector(modelName, {
+                maxFaces: 1,
+                flipHorizontal: false
+              });
+              console.log(`✓ ${modelName} detector loaded successfully`);
+              modelLoaded = true;
+              break;
+            } catch (err) {
+              console.warn(`${modelName} failed:`, err.message);
+            }
+          }
+        }
+        
+        // Strategy 3: Try direct MediaPipe loading
+        if (!modelLoaded && window.mediapipeTasksVision) {
+          try {
+            console.log('Attempting direct MediaPipe initialization...');
+            // Use mediapipe directly
+            const vision = window.mediapipeTasksVision;
+            detectorRef.current = await vision.FaceDetection.createFromOptions(
+              vision.FilesetResolver.forVisionTasks(
+                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2/wasm'
+              ),
+              {
+                baseOptions: {
+                  modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_classifier/mobilenet_v2/float32/1/mobilenet_v2.tflite'
+                },
+                runningMode: 'VIDEO'
+              }
+            );
+            console.log('✓ Direct MediaPipe detector loaded');
+            modelLoaded = true;
+          } catch (err) {
+            console.warn('Direct MediaPipe failed:', err.message);
+          }
+        }
+        
+        if (!modelLoaded) {
+          throw new Error('No face detection model could be initialized');
         }
         
         await startCamera();
       } catch (e) {
         console.error('Failed to initialize detector:', e);
-        console.error('Full error:', e);
         setStatus('error');
         toast.error(`Face detection error: ${e.message}`);
       }
