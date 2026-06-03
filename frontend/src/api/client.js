@@ -6,7 +6,7 @@ const baseURL = `${normalizedBaseURL}/api`;
 
 const client = axios.create({ 
   baseURL,
-  timeout: 30000, // 30 seconds timeout for normal operations
+  timeout: 60000, // 60 seconds timeout (increased from 30s after optimizations)
   withCredentials: true,
 });
 

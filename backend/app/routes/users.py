@@ -27,19 +27,19 @@ async def get_current_user_profile(current=Depends(get_current_user)):
 
 @router.get("/me/suggestions")
 async def user_suggestions(limit: int = 10, current=Depends(get_current_user)):
-    """Get connection suggestions for the current user with real mutual count."""
-    # Get accepted connections
+    """Get connection suggestions for the current user (optimized)."""
+    # Get accepted connections (limit to 300)
     accepted = await db.connections.find(
         {"status": "accepted", "$or": [{"requester_id": current["id"]}, {"receiver_id": current["id"]}]},
         {"_id": 0, "requester_id": 1, "receiver_id": 1},
-    ).to_list(1000)
+    ).limit(300).to_list(300)
     connected_ids = {c["requester_id"] if c["receiver_id"] == current["id"] else c["receiver_id"] for c in accepted}
     
-    # Get pending connections
+    # Get pending connections (limit to 200)
     pending = await db.connections.find(
         {"status": "pending", "$or": [{"requester_id": current["id"]}, {"receiver_id": current["id"]}]},
         {"_id": 0, "requester_id": 1, "receiver_id": 1},
-    ).to_list(1000)
+    ).limit(200).to_list(200)
     pending_ids = {p["requester_id"] if p["receiver_id"] == current["id"] else p["receiver_id"] for p in pending}
     
     exclude = connected_ids | pending_ids | {current["id"]}
@@ -52,7 +52,12 @@ async def user_suggestions(limit: int = 10, current=Depends(get_current_user)):
     if not users:
         return []
     
-    # Batch calculate mutual connections for all suggestions
+    # Batch calculate mutual connections for all suggestions (only if we have connected friends)
+    if not connected_ids:
+        for u in users:
+            u["mutual"] = 0
+        return users
+    
     suggestion_ids = [u["id"] for u in users]
     mutual_connections = await db.connections.find(
         {
@@ -63,7 +68,7 @@ async def user_suggestions(limit: int = 10, current=Depends(get_current_user)):
             ]
         },
         {"_id": 0, "requester_id": 1, "receiver_id": 1}
-    ).to_list(1000)
+    ).limit(500).to_list(500)
     
     # Count mutual per suggestion
     mutual_map = {}

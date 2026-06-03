@@ -37,7 +37,7 @@ async def list_invitations(current=Depends(get_current_user)):
     """List pending connection requests for the current user."""
     log.info("[/invitations] Fetching pending invitations")
     
-    # Get pending invitations
+    # Get pending invitations (limited to 50)
     invs = await db.connections.find(
         {"receiver_id": current["id"], "status": "pending"}, {"_id": 0}
     ).sort("created_at", -1).limit(50).to_list(50)
@@ -53,11 +53,11 @@ async def list_invitations(current=Depends(get_current_user)):
     
     user_map = await batch_fetch_users(requester_ids)
     
-    # Get current user's connections for mutual count calculation
+    # Get current user's connections for mutual count calculation (limited to 300)
     current_conns = await db.connections.find(
         {"status": "accepted", "$or": [{"requester_id": current["id"]}, {"receiver_id": current["id"]}]},
         {"_id": 0, "requester_id": 1, "receiver_id": 1},
-    ).to_list(1000)
+    ).limit(300).to_list(300)
     connected_ids = {c["requester_id"] if c["receiver_id"] == current["id"] else c["receiver_id"] for c in current_conns}
     
     # Fetch all mutual connections in one query
@@ -70,7 +70,7 @@ async def list_invitations(current=Depends(get_current_user)):
             ]
         },
         {"_id": 0, "requester_id": 1, "receiver_id": 1}
-    ).to_list(1000)
+    ).limit(500).to_list(500)
     
     # Count mutual per requester
     mutual_map = {}
@@ -164,11 +164,11 @@ async def ignore_connection(conn_id: str, current=Depends(get_current_user)):
 
 @router.get("/me")
 async def my_connections(current=Depends(get_current_user)):
-    """Get all connections for current user."""
+    """Get all connections for current user (limited to 200 for performance)."""
     conns = await db.connections.find(
         {"status": "accepted", "$or": [{"requester_id": current["id"]}, {"receiver_id": current["id"]}]},
         {"_id": 0},
-    ).limit(1000).to_list(1000)
+    ).limit(200).to_list(200)
     
     if not conns:
         return []
@@ -184,10 +184,10 @@ async def my_connections(current=Depends(get_current_user)):
 
 @router.get("/network")
 async def network_users(current=Depends(get_current_user)):
-    """Get ALL users with current relationship status for network discovery."""
+    """Get network discovery suggestions (limited to 50 for performance)."""
     log.debug("[/network] Fetching network data for current user")
     
-    # Get all relationship statuses
+    # Get relationship statuses (limit to 500 to avoid scanning too much)
     relations = await db.connections.find(
         {
             "status": {"$in": ["accepted", "pending"]},
@@ -197,11 +197,13 @@ async def network_users(current=Depends(get_current_user)):
             ],
         },
         {"_id": 0, "id": 1, "requester_id": 1, "receiver_id": 1, "status": 1}
-    ).to_list(5000)
+    ).to_list(500)
 
     status_map = {}
+    exclude_ids = {current["id"]}
     for relation in relations:
         other_id = relation["receiver_id"] if relation["requester_id"] == current["id"] else relation["requester_id"]
+        exclude_ids.add(other_id)
         if relation["status"] == "accepted":
             status_map[other_id] = {"relationship": "connected", "connection_id": relation["id"]}
         elif relation["status"] == "pending":
@@ -210,33 +212,32 @@ async def network_users(current=Depends(get_current_user)):
             else:
                 status_map[other_id] = {"relationship": "pending_received", "connection_id": relation["id"]}
 
-    log.debug(f"[/network] Found {len(status_map)} relationships")
+    log.debug(f"[/network] Found {len(status_map)} relationships, excluding {len(exclude_ids)} users")
 
-    # Fetch ALL users except current user
+    # Fetch only 50 users NOT connected/pending (OPTIMIZED - no full scan)
     all_users = await db.users.find(
-        {"id": {"$ne": current["id"]}},
-        {"_id": 0, "id": 1, "name": 1, "avatar": 1, "headline": 1, "cover": 1, "verified": 1}
-    ).to_list(10000)
+        {"id": {"$nin": list(exclude_ids)}},
+        {"_id": 0, "id": 1, "name": 1, "avatar": 1, "headline": 1, "verified": 1}
+    ).limit(50).to_list(50)
 
-    log.debug(f"[/network] Found {len(all_users)} total users")
+    log.debug(f"[/network] Found {len(all_users)} network suggestions")
 
     out = []
     for user in all_users:
-        const_status = status_map.get(user["id"], {})
         out.append({
             **user,
-            "relationship": const_status.get("relationship", "not_connected"),
-            "connection_id": const_status.get("connection_id"),
+            "relationship": "not_connected",
+            "connection_id": None,
         })
     
-    log.info(f"[/network] Returning {len(out)} users with relationship status")
+    log.info(f"[/network] Returning {len(out)} network suggestions")
     return out
 
 
 @router.get("/pending-sent")
 async def pending_sent(current=Depends(get_current_user)):
-    """Get list of pending connection requests sent by current user."""
+    """Get list of pending connection requests sent by current user (limited to 200)."""
     conns = await db.connections.find(
         {"requester_id": current["id"], "status": "pending"}, {"_id": 0, "receiver_id": 1}
-    ).limit(1000).to_list(1000)
+    ).limit(200).to_list(200)
     return [c["receiver_id"] for c in conns]
