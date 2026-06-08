@@ -56,7 +56,7 @@ export default function BiometricLiveness({ onComplete, onBack }) {
           'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm'
         );
         const landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-          baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker.task' },
+          baseOptions: { modelAssetPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm/face_landmarker.task' },
           runningMode: 'VIDEO',
           numFaces: 1,
         });
