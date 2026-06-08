@@ -58,7 +58,7 @@ export default function BiometricLiveness({ onComplete, onBack }) {
           solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm',
         };
         const model = await faceDetection.createDetector(
-          faceDetection.SupportedModels.MediaPipeFacetsDetector,
+          faceDetection.SupportedModels.MediaPipeFaceDetector,
           detectorConfig
         );
         setDetector(model);
