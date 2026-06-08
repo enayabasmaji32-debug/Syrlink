@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, CheckCircle2, AlertCircle, Camera } from 'lucide-react';
-import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
+import * as faceapi from 'face-api.js';
 import { toast } from 'sonner';
 
 /**
- * BiometricLiveness Component
+ * BiometricLiveness Component using face-api.js
  * Performs real-time biometric liveness detection with:
  * - Face detection and landmarks
  * - Head pose estimation (turn left/right)
@@ -16,12 +16,12 @@ import { toast } from 'sonner';
 export default function BiometricLiveness({ onComplete, onBack }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const [detector, setDetector] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Movement detection state
-  const [currentMovement, setCurrentMovement] = useState(0); // 0: turn right, 1: turn left, 2: blink, 3: open mouth
+  const [currentMovement, setCurrentMovement] = useState(0);
   const [movementProgress, setMovementProgress] = useState({
     0: false, // Turn right
     1: false, // Turn left
@@ -29,12 +29,10 @@ export default function BiometricLiveness({ onComplete, onBack }) {
     3: false, // Open mouth
   });
 
-  // Face landmarks and analysis state
   const analysisStateRef = useRef({
     headRotation: { pitch: 0, yaw: 0, roll: 0 },
-    eyeOpenness: [1, 1], // Left, Right
+    eyeOpenness: [1, 1],
     mouthOpenness: 0,
-    faceLandmarks: null,
     lastBlinkTime: 0,
     blinkInProgress: false,
     eyeClosureStart: null,
@@ -47,36 +45,36 @@ export default function BiometricLiveness({ onComplete, onBack }) {
     { id: 3, label: 'Open Mouth', instruction: 'افتح فمك', threshold: 0.3 },
   ];
 
-  // Initialize MediaPipe Face Landmarker
+  // Load face-api models
   useEffect(() => {
-    const initFaceLandmarker = async () => {
+    const loadModels = async () => {
       try {
         setIsLoading(true);
-        const filesetResolver = await FilesetResolver.forVisionTasks(
-          'https://unpkg.com/@mediapipe/tasks-vision@0.10.8/wasm'
-        );
-        const landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-          baseOptions: { modelAssetPath: 'https://unpkg.com/@mediapipe/tasks-vision@0.10.8/wasm/face_landmarker.task' },
-          runningMode: 'VIDEO',
-          numFaces: 1,
-        });
-        setDetector(landmarker);
+        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+        
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
+        ]);
+
         setError(null);
         setIsLoading(false);
+        setIsAnalyzing(true);
       } catch (err) {
-        console.error('Failed to load face landmarker model:', err);
-        setError('Failed to initialize face detection. Please refresh.');
+        console.error('Failed to load face detection models:', err);
+        setError('Failed to load face detection models. Please refresh.');
         toast.error('Failed to initialize face detection');
         setIsLoading(false);
       }
     };
 
-    initFaceLandmarker();
+    loadModels();
   }, []);
 
   // Access webcam
   useEffect(() => {
-    if (!detector) return;
+    if (!isAnalyzing) return;
 
     const setupCamera = async () => {
       try {
@@ -85,33 +83,34 @@ export default function BiometricLiveness({ onComplete, onBack }) {
         });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current.play();
+          };
         }
       } catch (err) {
         console.error('Camera access denied:', err);
         setError('Camera access is required for verification');
         toast.error('Camera access denied');
+        setIsAnalyzing(false);
       }
     };
 
     setupCamera();
-  }, [detector]);
+  }, [isAnalyzing]);
 
-  // Calculate 3D head pose from face landmarks
-  const estimateHeadPose = (landmarks, imageWidth, imageHeight) => {
-    if (!landmarks || landmarks.length < 468) {
+  // Calculate head pose from landmarks
+  const estimateHeadPose = (landmarks) => {
+    if (!landmarks || landmarks.length < 68) {
       return { pitch: 0, yaw: 0, roll: 0 };
     }
 
-    // Key landmark indices
-    const noseTip = landmarks[1]; // Nose tip
-    const rightEye = landmarks[33]; // Right eye outer corner
-    const leftEye = landmarks[263]; // Left eye outer corner
-    const chin = landmarks[152]; // Chin
-    const foreheadPoint = landmarks[10]; // Forehead
-    const mouthRight = landmarks[61]; // Mouth right
-    const mouthLeft = landmarks[291]; // Mouth left
+    // Key landmarks
+    const noseTip = landmarks[30]; // Nose tip
+    const rightEye = landmarks[36]; // Right eye outer corner
+    const leftEye = landmarks[45]; // Left eye outer corner
+    const chin = landmarks[8]; // Chin
+    const forehead = landmarks[27]; // Forehead center
 
-    // Calculate angles
     const eyeDistance = Math.hypot(rightEye.x - leftEye.x, rightEye.y - leftEye.y);
     const faceCenter = {
       x: (rightEye.x + leftEye.x) / 2,
@@ -124,7 +123,7 @@ export default function BiometricLiveness({ onComplete, onBack }) {
     const yaw = ((noseToEyeRight - noseToEyeLeft) / eyeDistance) * 90;
 
     // Pitch (up/down rotation)
-    const foreheadToChin = chin.y - foreheadPoint.y;
+    const foreheadToChin = chin.y - forehead.y;
     const noseToFace = noseTip.y - faceCenter.y;
     const pitch = (noseToFace / foreheadToChin) * 45;
 
@@ -139,145 +138,103 @@ export default function BiometricLiveness({ onComplete, onBack }) {
     };
   };
 
-  // Calculate mouth openness ratio
+  // Calculate mouth openness
   const calculateMouthOpenness = (landmarks) => {
-    if (!landmarks || landmarks.length < 468) return 0;
+    if (!landmarks || landmarks.length < 68) return 0;
 
-    // Mouth landmarks
-    const upperLip = landmarks[13]; // Upper lip center
-    const lowerLip = landmarks[14]; // Lower lip center
-    const mouthWidth =
-      Math.hypot(landmarks[61].x - landmarks[291].x, landmarks[61].y - landmarks[291].y) || 1;
-    const mouthHeight = Math.hypot(
-      upperLip.x - lowerLip.x,
-      upperLip.y - lowerLip.y
-    );
+    const upperLip = landmarks[62]; // Upper lip center
+    const lowerLip = landmarks[66]; // Lower lip center
+    const mouthLeft = landmarks[61]; // Mouth left
+    const mouthRight = landmarks[65]; // Mouth right
 
-    return Math.min(1, mouthHeight / mouthWidth);
+    const mouthHeight = Math.abs(upperLip.y - lowerLip.y);
+    const mouthWidth = Math.abs(mouthRight.x - mouthLeft.x);
+
+    return mouthWidth > 0 ? mouthHeight / mouthWidth : 0;
   };
 
-  // Calculate eye openness ratio
-  const calculateEyeOpenness = (landmarks, eyeSide) => {
-    if (!landmarks || landmarks.length < 468) return 1;
+  // Calculate eye openness
+  const calculateEyeOpenness = (landmarks, eye) => {
+    if (!landmarks || landmarks.length < 68) return 1;
 
-    let eyelidTop, eyelidBottom, eyeInner, eyeOuter;
+    let eyeTop, eyeBottom, eyeLeft, eyeRight;
 
-    if (eyeSide === 'left') {
-      eyelidTop = landmarks[386]; // Left eye upper eyelid
-      eyelidBottom = landmarks[374]; // Left eye lower eyelid
-      eyeInner = landmarks[362]; // Left eye inner corner
-      eyeOuter = landmarks[263]; // Left eye outer corner
+    if (eye === 'left') {
+      eyeLeft = landmarks[42]; // Left eye left corner
+      eyeRight = landmarks[39]; // Left eye right corner
+      eyeTop = landmarks[37]; // Left eye top
+      eyeBottom = landmarks[41]; // Left eye bottom
     } else {
-      eyelidTop = landmarks[159]; // Right eye upper eyelid
-      eyelidBottom = landmarks[145]; // Right eye lower eyelid
-      eyeInner = landmarks[33]; // Right eye inner corner
-      eyeOuter = landmarks[133]; // Right eye outer corner
+      eyeLeft = landmarks[36]; // Right eye left corner
+      eyeRight = landmarks[35]; // Right eye right corner
+      eyeTop = landmarks[28]; // Right eye top
+      eyeBottom = landmarks[31]; // Right eye bottom
     }
 
-    const eyeWidth = Math.hypot(eyeOuter.x - eyeInner.x, eyeOuter.y - eyeInner.y) || 1;
-    const eyeHeight = Math.hypot(eyelidTop.x - eyelidBottom.x, eyelidTop.y - eyelidBottom.y);
+    const eyeHeight = Math.abs(eyeTop.y - eyeBottom.y);
+    const eyeWidth = Math.abs(eyeRight.x - eyeLeft.x);
 
-    return Math.min(1, eyeHeight / eyeWidth);
+    return eyeWidth > 0 ? eyeHeight / eyeWidth : 1;
   };
 
-  // Detect blink event
-  const detectBlink = (eyeOpenness) => {
-    const state = analysisStateRef.current;
-    const threshold = 0.2;
-
-    // Eye closed
-    if (eyeOpenness < threshold) {
-      if (!state.blinkInProgress) {
-        state.blinkInProgress = true;
-        state.eyeClosureStart = Date.now();
-      }
-    }
-    // Eye opened
-    else if (state.blinkInProgress && state.eyeClosureStart) {
-      const closureDuration = Date.now() - state.eyeClosureStart;
-
-      // Valid blink: 150-250ms
-      if (closureDuration >= 150 && closureDuration <= 250) {
-        state.blinkInProgress = false;
-        state.eyeClosureStart = null;
-        return true;
-      }
-
-      // Too long or too short, reset
-      if (closureDuration > 250) {
-        state.blinkInProgress = false;
-        state.eyeClosureStart = null;
-      }
-    }
-
-    return false;
-  };
-
-  // Check if movement threshold is met
-  const checkMovementThreshold = (movementId, pose, eyeOpenness, mouthOpenness) => {
-    const movement = MOVEMENTS[movementId];
-
-    switch (movementId) {
+  // Check movement threshold
+  const checkMovementThreshold = (movement, pose, eyeOpenness, mouthOpenness) => {
+    switch (movement) {
       case 0: // Turn right
-        return pose.yaw > movement.threshold;
+        return pose.yaw > MOVEMENTS[0].threshold;
       case 1: // Turn left
-        return pose.yaw < movement.threshold;
+        return pose.yaw < MOVEMENTS[1].threshold;
       case 2: // Blink
-        return detectBlink(Math.min(eyeOpenness[0], eyeOpenness[1]));
+        return eyeOpenness[0] < 0.2 || eyeOpenness[1] < 0.2;
       case 3: // Open mouth
-        return mouthOpenness > movement.threshold;
+        return mouthOpenness > MOVEMENTS[3].threshold;
       default:
         return false;
     }
   };
 
-  // Draw face landmarks and analysis info on canvas
-  const drawAnalysis = (landmarks, pose, eyeOpenness, mouthOpenness, ctx, imageWidth, imageHeight) => {
+  // Draw analysis on canvas
+  const drawAnalysis = (detections, landmarks, pose, eyeOpenness, mouthOpenness, ctx, imageWidth, imageHeight) => {
     ctx.clearRect(0, 0, imageWidth, imageHeight);
 
-    // Draw face landmarks
+    // Draw landmarks
     if (landmarks) {
-      ctx.fillStyle = '#0a66c2';
-      landmarks.forEach((landmark) => {
-        if (landmark.x >= 0 && landmark.x <= imageWidth && landmark.y >= 0 && landmark.y <= imageHeight) {
-          ctx.beginPath();
-          ctx.arc(landmark.x, landmark.y, 2, 0, 2 * Math.PI);
-          ctx.fill();
-        }
+      ctx.fillStyle = '#00FF00';
+      landmarks.forEach((lm) => {
+        ctx.fillRect(lm.x - 2, lm.y - 2, 4, 4);
       });
     }
 
-    // Draw head pose indicators
-    const centerX = imageWidth / 2;
-    const centerY = imageHeight / 2;
-    const arrowLength = 50;
-
-    // Draw yaw angle (left/right)
-    ctx.strokeStyle = '#ff6b6b';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(centerX, centerY);
-    ctx.lineTo(
-      centerX + Math.cos((pose.yaw * Math.PI) / 180) * arrowLength,
-      centerY + Math.sin((pose.yaw * Math.PI) / 180) * arrowLength
-    );
-    ctx.stroke();
-
-    // Draw current movement instructions and info
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 24px Arial';
-    ctx.strokeStyle = '#0a66c2';
-    ctx.lineWidth = 4;
-
-    const currentMov = MOVEMENTS[currentMovement];
-    ctx.strokeText(currentMov.instruction, 20, 50);
-    ctx.fillText(currentMov.instruction, 20, 50);
-
-    // Display analytics
-    ctx.font = 'bold 16px Arial';
-    ctx.fillStyle = '#ffffff';
+    // Draw current instruction
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 28px Arial';
+    ctx.textAlign = 'center';
     ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3;
+
+    const instruction = MOVEMENTS[currentMovement].instruction;
+    ctx.strokeText(instruction, imageWidth / 2, 60);
+    ctx.fillText(instruction, imageWidth / 2, 60);
+
+    // Draw movement status
+    ctx.font = 'bold 16px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'left';
+
+    MOVEMENTS.forEach((m, idx) => {
+      const color = movementProgress[idx] ? '#00FF00' : '#FF6B6B';
+      ctx.fillStyle = color;
+      ctx.fillRect(20 + idx * 150, imageHeight - 50, 140, 30);
+      
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText(m.label, 30 + idx * 150, imageHeight - 25);
+    });
+
+    // Draw analytics
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'left';
 
     const analytics = [
       `Head Yaw: ${pose.yaw}°`,
@@ -286,15 +243,18 @@ export default function BiometricLiveness({ onComplete, onBack }) {
     ];
 
     analytics.forEach((text, idx) => {
-      const y = imageHeight - 50 + idx * 25;
+      const y = imageHeight - 120 + idx * 25;
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 3;
       ctx.strokeText(text, 20, y);
+      ctx.fillStyle = '#FFFFFF';
       ctx.fillText(text, 20, y);
     });
   };
 
-  // Main analysis loop - runs at 25-30 FPS with requestAnimationFrame
+  // Main analysis loop
   const analyzeFrame = async () => {
-    if (!detector || !videoRef.current || videoRef.current.readyState !== 4) {
+    if (!videoRef.current || videoRef.current.readyState !== 4) {
       requestAnimationFrame(analyzeFrame);
       return;
     }
@@ -303,60 +263,49 @@ export default function BiometricLiveness({ onComplete, onBack }) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
 
-      // Run face landmarker
-      const results = await detector.detectForVideo(video, performance.now());
+      const detections = await faceapi
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks();
 
-      if (!results.faceLandmarks || results.faceLandmarks.length === 0) {
+      if (!detections) {
         requestAnimationFrame(analyzeFrame);
         return;
       }
 
-      const landmarks = results.faceLandmarks[0];
+      const landmarks = detections.landmarks.positions;
       const imageWidth = video.videoWidth;
       const imageHeight = video.videoHeight;
 
-      // Convert landmarks to keypoints format
-      const keypoints = landmarks.map(lm => ({
-        x: lm.x * imageWidth,
-        y: lm.y * imageHeight,
-        z: lm.z,
-      }));
-
-      // Set canvas dimensions
       canvas.width = imageWidth;
       canvas.height = imageHeight;
       const ctx = canvas.getContext('2d');
 
       // Calculate metrics
-      const pose = estimateHeadPose(keypoints, imageWidth, imageHeight);
+      const pose = estimateHeadPose(landmarks);
       const eyeOpenness = [
-        calculateEyeOpenness(keypoints, 'left'),
-        calculateEyeOpenness(keypoints, 'right'),
+        calculateEyeOpenness(landmarks, 'left'),
+        calculateEyeOpenness(landmarks, 'right'),
       ];
-      const mouthOpenness = calculateMouthOpenness(keypoints);
+      const mouthOpenness = calculateMouthOpenness(landmarks);
 
-      // Update analysis state
       const state = analysisStateRef.current;
       state.headRotation = pose;
       state.eyeOpenness = eyeOpenness;
       state.mouthOpenness = mouthOpenness;
-      state.faceLandmarks = keypoints;
 
-      // Draw analysis on canvas
-      drawAnalysis(keypoints, pose, eyeOpenness, mouthOpenness, ctx, imageWidth, imageHeight);
+      // Draw analysis
+      drawAnalysis(detections, landmarks, pose, eyeOpenness, mouthOpenness, ctx, imageWidth, imageHeight);
 
-      // Check if current movement threshold is met
+      // Check movement threshold
       if (checkMovementThreshold(currentMovement, pose, eyeOpenness, mouthOpenness)) {
         setMovementProgress((prev) => {
           const updated = { ...prev };
           updated[currentMovement] = true;
 
-          // Move to next movement or capture if all complete
           if (currentMovement < 3) {
             setCurrentMovement(currentMovement + 1);
             toast.success(`✓ ${MOVEMENTS[currentMovement].label} detected!`);
           } else {
-            // All movements complete - capture and submit
             captureAndSubmit();
           }
 
@@ -370,7 +319,7 @@ export default function BiometricLiveness({ onComplete, onBack }) {
     requestAnimationFrame(analyzeFrame);
   };
 
-  // Capture frame and submit
+  // Capture and submit
   const captureAndSubmit = async () => {
     try {
       const video = videoRef.current;
@@ -385,136 +334,98 @@ export default function BiometricLiveness({ onComplete, onBack }) {
         onComplete(file);
       }, 'image/jpeg', 0.95);
     } catch (err) {
-      console.error('Capture error:', err);
+      console.error('Error capturing frame:', err);
       toast.error('Failed to capture image');
     }
   };
 
-  // Start analysis loop when detector is ready
+  // Start analysis loop
   useEffect(() => {
-    if (detector && videoRef.current) {
-      const videoElement = videoRef.current;
-      videoElement.onloadedmetadata = () => {
-        requestAnimationFrame(analyzeFrame);
-      };
+    if (isAnalyzing) {
+      const frameId = requestAnimationFrame(analyzeFrame);
+      return () => cancelAnimationFrame(frameId);
     }
-  }, [detector, currentMovement]);
+  }, [isAnalyzing, currentMovement]);
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#0a66c2] border-t-transparent mb-4" />
-        <p className="text-gray-600 font-semibold">Initializing biometric system...</p>
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-900">
+        <Camera className="w-16 h-16 text-blue-500 mb-4 animate-spin" />
+        <p className="text-white text-lg">Loading face detection models...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 space-y-4">
-        <AlertCircle className="w-12 h-12 text-red-600" />
-        <p className="text-red-600 font-semibold">{error}</p>
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-900">
+        <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
+        <p className="text-white text-lg mb-4">{error}</p>
         <button
           onClick={onBack}
-          className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300 transition"
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          Go Back
+          Back
         </button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Video Feed */}
-      <div className="relative">
-        <div className="relative bg-black rounded-xl overflow-hidden w-full" style={{ aspectRatio: '4/3' }}>
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ transform: 'scaleX(-1)' }}
-          />
-          <canvas
-            ref={canvasRef}
-            className="absolute inset-0 w-full h-full"
-            style={{ transform: 'scaleX(-1)' }}
-          />
-        </div>
-
-        {/* Overlay Instructions */}
-        <div className="absolute top-4 left-4 right-4">
-          <div className="bg-[#0a66c2] text-white rounded-lg p-3 text-center">
-            <p className="text-sm font-semibold">{MOVEMENTS[currentMovement].instruction}</p>
-            <p className="text-xs text-blue-100 mt-1">{MOVEMENTS[currentMovement].label}</p>
-          </div>
-        </div>
+    <div className="flex flex-col h-screen bg-gray-900">
+      <div className="flex-1 relative">
+        <video
+          ref={videoRef}
+          className="w-full h-full object-cover"
+          style={{ transform: 'scaleX(-1)' }}
+        />
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full"
+          style={{ transform: 'scaleX(-1)' }}
+        />
       </div>
 
-      {/* Progress Tracker */}
-      <div className="space-y-3">
-        <p className="text-sm font-semibold text-gray-900">Verification Progress</p>
-        <div className="grid grid-cols-4 gap-2">
-          {MOVEMENTS.map((movement) => (
-            <div
-              key={movement.id}
-              className={`p-3 rounded-lg text-center transition ${
-                movementProgress[movement.id]
-                  ? 'bg-green-100 border-2 border-green-500'
-                  : currentMovement === movement.id
-                  ? 'bg-blue-100 border-2 border-[#0a66c2]'
-                  : 'bg-gray-100 border-2 border-gray-300'
-              }`}
+      <div className="bg-gray-800 p-4 border-t border-gray-700">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-white text-lg font-semibold">
+              تحقق بيومتري {`(${currentMovement + 1}/4)`} | Biometric Verification
+            </h2>
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 text-gray-300 hover:text-white"
             >
-              <div className="text-2xl mb-1">
-                {movementProgress[movement.id] ? '✓' : movement.id === 0 ? '→' : movement.id === 1 ? '←' : movement.id === 2 ? '👁' : '👄'}
+              <ArrowLeft className="w-5 h-5" />
+              Back
+            </button>
+          </div>
+
+          <div className="grid grid-cols-4 gap-2">
+            {MOVEMENTS.map((movement, idx) => (
+              <div
+                key={idx}
+                className={`p-3 rounded-lg text-center transition-all ${
+                  movementProgress[idx]
+                    ? 'bg-green-600 text-white'
+                    : idx === currentMovement
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300'
+                }`}
+              >
+                <div className="flex justify-center mb-1">
+                  {movementProgress[idx] ? (
+                    <CheckCircle2 className="w-5 h-5" />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full border-2 border-current" />
+                  )}
+                </div>
+                <p className="text-xs font-semibold">{movement.label}</p>
               </div>
-              <p className="text-xs font-semibold text-gray-700">{movement.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Instructions */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
-        <p className="text-sm font-semibold text-blue-900">📋 Complete all movements in order:</p>
-        <ul className="text-xs text-blue-800 space-y-1 ml-4">
-          <li>✓ Turn your head to the right ({">"} 15°)</li>
-          <li>✓ Turn your head to the left ({"<"} -15°)</li>
-          <li>✓ Blink your eyes (150-250ms)</li>
-          <li>✓ Open your mouth (30%+ gap)</li>
-        </ul>
-      </div>
-
-      {/* Actions */}
-      <div className="flex gap-3">
-        <button
-          onClick={onBack}
-          className="flex-1 border-2 border-gray-300 text-gray-700 font-semibold rounded-full py-3 hover:bg-gray-100 transition flex items-center justify-center gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </button>
-        <button
-          onClick={captureAndSubmit}
-          disabled={currentMovement < 3 || !movementProgress[3]}
-          className="flex-1 bg-gradient-to-r from-[#0a66c2] to-[#005ba1] hover:shadow-lg disabled:opacity-50 text-white font-semibold rounded-full py-3 flex items-center justify-center gap-2 transition"
-        >
-          <Camera className="w-4 h-4" />
-          Capture Now
-        </button>
-      </div>
-
-      {/* Loading State */}
-      {!detector && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-xl">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-4 border-white border-t-transparent mb-2" />
-            <p className="text-white text-sm">Initializing...</p>
+            ))}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
