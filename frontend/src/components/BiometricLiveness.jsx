@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, CheckCircle2, AlertCircle, Camera } from 'lucide-react';
-import * as faceDetection from '@tensorflow-models/face-detection';
-import '@tensorflow/tfjs';
+import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import { toast } from 'sonner';
 
 /**
@@ -48,31 +47,31 @@ export default function BiometricLiveness({ onComplete, onBack }) {
     { id: 3, label: 'Open Mouth', instruction: 'افتح فمك', threshold: 0.3 },
   ];
 
-  // Initialize TensorFlow Face Detection
+  // Initialize MediaPipe Face Landmarker
   useEffect(() => {
-    const initFaceDetection = async () => {
+    const initFaceLandmarker = async () => {
       try {
         setIsLoading(true);
-        const detectorConfig = {
-          runtime: 'mediapipe',
-          solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm',
-        };
-        const model = await faceDetection.createDetector(
-          faceDetection.SupportedModels.MediaPipeFaceDetector,
-          detectorConfig
+        const filesetResolver = await FilesetResolver.forVisionTasks(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm'
         );
-        setDetector(model);
+        const landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+          baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker.task' },
+          runningMode: 'VIDEO',
+          numFaces: 1,
+        });
+        setDetector(landmarker);
         setError(null);
+        setIsLoading(false);
       } catch (err) {
-        console.error('Failed to load face detection model:', err);
-        setError('Failed to load face detection model. Please try again.');
+        console.error('Failed to load face landmarker model:', err);
+        setError('Failed to initialize face detection. Please refresh.');
         toast.error('Failed to initialize face detection');
-      } finally {
         setIsLoading(false);
       }
     };
 
-    initFaceDetection();
+    initFaceLandmarker();
   }, []);
 
   // Access webcam
@@ -304,18 +303,24 @@ export default function BiometricLiveness({ onComplete, onBack }) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
 
-      // Run face detection
-      const predictions = await detector.estimateFaces(video, false);
+      // Run face landmarker
+      const results = await detector.detectForVideo(video, performance.now());
 
-      if (!predictions.length) {
+      if (!results.faceLandmarks || results.faceLandmarks.length === 0) {
         requestAnimationFrame(analyzeFrame);
         return;
       }
 
-      const face = predictions[0];
-      const keypoints = face.keypoints;
+      const landmarks = results.faceLandmarks[0];
       const imageWidth = video.videoWidth;
       const imageHeight = video.videoHeight;
+
+      // Convert landmarks to keypoints format
+      const keypoints = landmarks.map(lm => ({
+        x: lm.x * imageWidth,
+        y: lm.y * imageHeight,
+        z: lm.z,
+      }));
 
       // Set canvas dimensions
       canvas.width = imageWidth;
