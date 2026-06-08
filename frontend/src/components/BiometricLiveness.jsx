@@ -53,10 +53,10 @@ export default function BiometricLiveness({ onComplete, onBack }) {
       try {
         setIsLoading(true);
         const filesetResolver = await FilesetResolver.forVisionTasks(
-          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm'
+          'https://unpkg.com/@mediapipe/tasks-vision@0.10.8/wasm'
         );
         const landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-          baseOptions: { modelAssetPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm/face_landmarker.task' },
+          baseOptions: { modelAssetPath: 'https://unpkg.com/@mediapipe/tasks-vision@0.10.8/wasm/face_landmarker.task' },
           runningMode: 'VIDEO',
           numFaces: 1,
         });
