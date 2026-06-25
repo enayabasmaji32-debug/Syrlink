@@ -1,46 +1,13 @@
 """Messages and conversations routes."""
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends
 
 from app.models import MessageIn, ConversationIn
 from app.security import get_current_user
-from app.utils import uid, now_iso, time_ago, fetch_user_brief
+from app.utils import uid, now_iso, time_ago, fetch_user_brief, create_notification, batch_fetch_users, is_user_online
 from app.database import db
 
 router = APIRouter(prefix="/conversations", tags=["messages"])
-
-
-def is_user_online(last_seen: str) -> bool:
-    """Check if user is online based on last_seen timestamp (within 5 minutes)."""
-    try:
-        last_seen_dt = datetime.fromisoformat(last_seen)
-    except Exception:
-        return False
-    
-    if last_seen_dt.tzinfo is None:
-        last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
-    
-    now = datetime.now(timezone.utc)
-    delta = now - last_seen_dt
-    return delta < timedelta(minutes=5)
-
-
-async def batch_fetch_users(user_ids: List[str]) -> Dict[str, Dict[str, Any]]:
-    """Batch fetch multiple users to avoid N+1 queries."""
-    unique_ids = list(set([uid for uid in user_ids if uid]))
-    if not unique_ids:
-        return {}
-    users = await db.users.find(
-        {"id": {"$in": unique_ids}}, 
-        {"_id": 0, "id": 1, "name": 1, "avatar": 1, "headline": 1, "last_seen": 1}
-    ).to_list(len(unique_ids))
-    user_map = {u["id"]: u for u in users}
-    # Add defaults for missing users
-    for _uid in unique_ids:
-        if _uid not in user_map:
-            user_map[_uid] = {"id": _uid, "name": "Unknown", "avatar": "", "headline": ""}
-    return user_map
 
 
 @router.get("")
@@ -77,13 +44,18 @@ async def list_conversations(current=Depends(get_current_user)):
 
 
 @router.get("/{conv_id}/messages")
-async def get_messages(conv_id: str, current=Depends(get_current_user)):
-    """Get all messages in a conversation."""
+async def get_messages(conv_id: str, cursor: Optional[str] = None, limit: int = 50, current=Depends(get_current_user)):
+    """Get messages in a conversation with cursor-based pagination."""
+    limit = min(max(limit, 1), 50)
     conv = await db.conversations.find_one({"id": conv_id})
     if not conv or current["id"] not in conv["participants"]:
         raise HTTPException(status_code=404, detail="Conversation not found")
     
-    msgs = await db.messages.find({"conversation_id": conv_id}, {"_id": 0}).sort("created_at", 1).to_list(1000)
+    query = {"conversation_id": conv_id}
+    if cursor:
+        query["created_at"] = {"$gt": cursor}  # after cursor for ascending
+    
+    msgs = await db.messages.find(query, {"_id": 0}).sort("created_at", 1).limit(limit).to_list(limit)
     
     # Mark as read
     await db.messages.update_many(
@@ -103,7 +75,8 @@ async def get_messages(conv_id: str, current=Depends(get_current_user)):
     
     other_id = next((p for p in conv["participants"] if p != current["id"]), None)
     user = await fetch_user_brief(other_id) if other_id else {}
-    return {"id": conv_id, "user": user, "thread": out}
+    next_cursor = msgs[-1]["created_at"] if len(msgs) == limit else None
+    return {"id": conv_id, "user": user, "thread": out, "next_cursor": next_cursor}
 
 
 @router.post("/{conv_id}/messages")

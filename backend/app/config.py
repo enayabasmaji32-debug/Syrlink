@@ -16,7 +16,7 @@ MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ["DB_NAME"]
 JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRY_MIN = int(os.environ.get("JWT_EXPIRY_MIN", "10080"))
+JWT_EXPIRY_MIN = int(os.environ.get("JWT_EXPIRY_MIN", "60"))
 
 # Cloudinary
 CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "")
@@ -29,12 +29,20 @@ APP_URL = os.environ.get("APP_URL", "")
 # restrict to localhost for development. In production, require explicit config.
 raw_cors = os.environ.get("CORS_ORIGINS")
 if raw_cors:
-	CORS_ORIGINS = [origin.strip() for origin in raw_cors.split(",") if origin.strip()]
+    CORS_ORIGINS = [origin.strip() for origin in raw_cors.split(",") if origin.strip()]
 else:
-	# default to localhost in dev to avoid open CORS
-	if os.environ.get("ENV", "dev").lower() == "production":
-		raise RuntimeError("CORS_ORIGINS must be set in production environment")
-	CORS_ORIGINS = ["http://localhost:3000"]
+    # If APP_URL is set, use it as the allowed origin (helpful for deployed single-host setups)
+    if APP_URL:
+        CORS_ORIGINS = [APP_URL.rstrip('/')]
+    else:
+        # default to localhost in dev to avoid open CORS
+        if os.environ.get("ENV", "dev").lower() == "production":
+            raise RuntimeError("CORS_ORIGINS must be set in production environment")
+        CORS_ORIGINS = ["http://localhost:3000"]
+
+# Prevent accidental wildcard in production
+if "*" in CORS_ORIGINS and os.environ.get("ENV", "dev").lower() == "production":
+    raise RuntimeError("Wildcard CORS is not allowed in production. Set explicit CORS_ORIGINS.")
 
 # Redis (optional) for OTP/session storage
 REDIS_URL = os.environ.get("REDIS_URL", "")
@@ -70,6 +78,12 @@ if GOOGLE_CLIENT_SECRET and GOOGLE_CLIENT_SECRET.startswith("["):
     log.warning("⚠️  GOOGLE_CLIENT_SECRET appears to be a placeholder, disabling Google OAuth")
     GOOGLE_CLIENT_SECRET = ""
 
-# Admin defaults
-ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "basmajienaya@gmail.com").lower()
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Admin@SyrLink2026")
+# Admin credentials — required, no defaults
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+if not ADMIN_EMAIL or not ADMIN_PASSWORD:
+    raise RuntimeError("ADMIN_EMAIL and ADMIN_PASSWORD must be set in environment")
+
+# JWT refresh token settings
+JWT_REFRESH_EXPIRY_DAYS = int(os.environ.get("JWT_REFRESH_EXPIRY_DAYS", "7"))
+JWT_REFRESH_COOKIE_NAME = os.environ.get("JWT_REFRESH_COOKIE_NAME", "li_refresh")

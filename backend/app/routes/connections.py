@@ -4,32 +4,11 @@ from fastapi import APIRouter, HTTPException, Depends
 
 from app.models import ConnectionRequestIn
 from app.security import get_current_user
-from app.utils import uid, now_iso, create_notification
+from app.utils import uid, now_iso, create_notification, batch_fetch_users
 from app.database import db
 from app.config import log
 
 router = APIRouter(prefix="/connections", tags=["connections"])
-
-
-async def batch_fetch_users(user_ids: List[str]) -> Dict[str, Dict[str, Any]]:
-    """Batch fetch multiple users to avoid N+1 queries."""
-    unique_ids = list(set(user_ids))
-    log.info(f"[batch_fetch_users] Fetching {len(unique_ids)} unique users")
-    
-    users = await db.users.find(
-        {"id": {"$in": unique_ids}}, 
-        {"_id": 0, "id": 1, "name": 1, "avatar": 1, "headline": 1}
-    ).to_list(len(unique_ids))
-    
-    log.debug(f"[batch_fetch_users] Found {len(users)} users in DB")
-    
-    user_map = {u["id"]: u for u in users}
-    # Add defaults for missing users
-    for _uid in unique_ids:
-        if _uid not in user_map:
-            log.warning(f"[batch_fetch_users] User not found, using Unknown")
-            user_map[_uid] = {"id": _uid, "name": "Unknown", "avatar": "", "headline": ""}
-    return user_map
 
 
 @router.get("/invitations")

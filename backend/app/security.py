@@ -8,7 +8,7 @@ import jwt
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 
-from app.config import JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRY_MIN, JWT_COOKIE_NAME, log
+from app.config import JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRY_MIN, JWT_REFRESH_EXPIRY_DAYS, JWT_COOKIE_NAME, JWT_REFRESH_COOKIE_NAME, log
 from app.database import db
 
 security = HTTPBearer(auto_error=False)
@@ -48,7 +48,31 @@ def create_token(user_id: str, email: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-async def get_current_user(
+def create_refresh_token(user_id: str, email: str) -> str:
+    """Create a JWT refresh token for a user."""
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "type": "refresh",
+        "exp": datetime.now(timezone.utc) + timedelta(days=JWT_REFRESH_EXPIRY_DAYS),
+        "iat": datetime.now(timezone.utc),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+async def verify_refresh_token(token: str) -> Dict[str, Any]:
+    """Verify a refresh token and return the payload."""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+    return payload
+
+
     request: Request,
     creds: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> Dict[str, Any]:

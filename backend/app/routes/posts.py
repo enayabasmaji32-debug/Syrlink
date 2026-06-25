@@ -7,7 +7,7 @@ from slowapi.util import get_remote_address
 
 from app.models import PostIn, CommentIn, ReactionIn, RepostIn
 from app.security import get_current_user
-from app.utils import uid, now_iso, time_ago, fetch_user_brief, create_notification, log
+from app.utils import uid, now_iso, time_ago, fetch_user_brief, create_notification, log, batch_fetch_users
 from app.database import db
 
 router = APIRouter(prefix="/posts", tags=["posts"])
@@ -56,18 +56,6 @@ async def serialize_post_with_author(post: Dict[str, Any], author: Dict[str, Any
         "timeAgo": time_ago(post["created_at"]),
         "company_id": post.get("company_id"),
     }
-
-
-async def batch_fetch_users(author_ids: List[str]) -> Dict[str, Dict[str, Any]]:
-    """Batch fetch multiple users by ID to avoid N+1 queries."""
-    unique_ids = list(set(author_ids))
-    users = await db.users.find({"id": {"$in": unique_ids}}, {"_id": 0, "id": 1, "name": 1, "avatar": 1, "headline": 1}).to_list(len(unique_ids))
-    user_map = {u["id"]: u for u in users}
-    # Add default entries for missing users
-    for _uid in unique_ids:
-        if _uid not in user_map:
-            user_map[_uid] = {"id": _uid, "name": "Unknown", "avatar": "", "headline": ""}
-    return user_map
 
 
 @router.get("")

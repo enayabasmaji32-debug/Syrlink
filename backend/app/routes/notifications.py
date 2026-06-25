@@ -3,25 +3,10 @@ from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, HTTPException, Depends
 
 from app.security import get_current_user
-from app.utils import time_ago, fetch_user_brief, uid, now_iso
+from app.utils import time_ago, fetch_user_brief, uid, now_iso, batch_fetch_users
 from app.database import db
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
-
-
-async def batch_fetch_users(user_ids: List[str]) -> Dict[str, Dict[str, Any]]:
-    """Batch fetch multiple users to avoid N+1 queries."""
-    unique_ids = list(set(user_ids))
-    users = await db.users.find(
-        {"id": {"$in": unique_ids}}, 
-        {"_id": 0, "id": 1, "name": 1, "avatar": 1}
-    ).to_list(len(unique_ids))
-    user_map = {u["id"]: u for u in users}
-    # Add defaults for missing users
-    for _uid in unique_ids:
-        if _uid not in user_map:
-            user_map[_uid] = {"id": _uid, "name": "Unknown", "avatar": ""}
-    return user_map
 
 
 @router.get("")

@@ -1,4 +1,5 @@
 """Main FastAPI application."""
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -14,6 +15,21 @@ from app.database import client
 from app.security import hash_password
 from app.utils import uid, now_iso
 
+# Sentry error tracking
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    sentry_dsn = os.environ.get("SENTRY_DSN")
+    if sentry_dsn:
+        sentry_sdk.init(
+            dsn=sentry_dsn,
+            integrations=[FastApiIntegration()],
+            traces_sample_rate=0.1,
+        )
+        log.info("Sentry initialized")
+except Exception:
+    pass
+
 # Import routers
 from app.routes.auth import router as auth_router
 from app.routes.users import router as users_router
@@ -28,6 +44,8 @@ from app.routes.database import router as database_router
 from app.routes.other import verification_router, admin_router, util_router, reports_router, companies_requests_router
 from app.routes.professional import companies_router, recommendations_router, endorsements_router, position_requests_router
 from app.routes.websocket import router as websocket_router
+from app.routes.biometric import router as biometric_router
+from app.liveness.routes import router as liveness_router
 from app.database import db
 
 # Create FastAPI app
@@ -107,6 +125,8 @@ app.include_router(endorsements_router, prefix=api_prefix)
 app.include_router(position_requests_router, prefix=api_prefix)
 app.include_router(util_router, prefix=api_prefix)
 app.include_router(websocket_router, prefix=api_prefix)
+app.include_router(biometric_router, prefix=api_prefix)
+app.include_router(liveness_router, prefix=api_prefix)
 
 # Serve frontend build if it exists
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -279,6 +299,14 @@ async def startup():
         log.info("✓ Position requests collection indexes created")
     except Exception as e:
         log.warning(f"Position requests indexes: {e}")
+    
+    # ADMIN_NOTIFICATIONS indexes
+    try:
+        await db.admin_notifications.create_index([("created_at", -1)])
+        await db.admin_notifications.create_index([("read", 1)])
+        log.info("✓ Admin notifications collection indexes created")
+    except Exception as e:
+        log.warning(f"Admin notifications indexes: {e}")
     
     # Auto seed if empty
     try:

@@ -4,7 +4,7 @@ from typing import Optional
 
 from app.models import CompanyIn, CompanyRequestIn, CompanyEmployeeIn, EmployeePositionRequestIn, RecommendationIn, EndorsementIn
 from app.security import get_current_user
-from app.utils import uid, now_iso, fetch_user_brief, create_notification
+from app.utils import uid, now_iso, fetch_user_brief, create_notification, create_admin_notification
 from app.database import db
 
 # Companies router
@@ -51,8 +51,7 @@ async def request_company(data: CompanyRequestIn, current=Depends(get_current_us
     }
     await db.company_requests.insert_one(doc)
     
-    await create_notification(
-        user_id=None,  # Send to admins
+    await create_admin_notification(
         actor_id=current["id"],
         ntype="admin",
         text=f"New company request from {current['name']}: {data.name}",
@@ -99,18 +98,18 @@ async def create_company(data: CompanyIn, current=Depends(get_current_user)):
 
 
 @companies_router.get("")
-async def list_companies(q: Optional[str] = None, skip: int = 0, limit: int = 20, current=Depends(get_current_user)):
-    """List approved companies with optional search, sorted by creation date."""
+async def list_companies(q: Optional[str] = None, skip: int = 0, limit: int = 20, seeking_investment: Optional[bool] = None, current=Depends(get_current_user)):
+    """List approved companies with optional search and investment filter."""
     query = {"status": "approved"}
     if q:
-        # Use text search if available, fallback to regex
         query["$or"] = [
             {"name": {"$regex": q, "$options": "i"}},
             {"industry": {"$regex": q, "$options": "i"}},
             {"location": {"$regex": q, "$options": "i"}},
         ]
+    if seeking_investment is not None:
+        query["is_looking_for_investors"] = seeking_investment
     
-    # Only fetch essential fields for list view
     projection = {
         "_id": 0,
         "id": 1,
@@ -120,8 +119,13 @@ async def list_companies(q: Optional[str] = None, skip: int = 0, limit: int = 20
         "location": 1,
         "industry": 1,
         "is_looking_for_investors": 1,
+        "valuation": 1,
+        "investment_type": 1,
+        "funding_amount": 1,
+        "available_equity": 1,
+        "funding_round_status": 1,
         "created_at": 1,
-        "employee_count": 1
+        "employees_count": 1,
     }
     
     total = await db.companies.count_documents(query)

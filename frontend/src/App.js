@@ -18,6 +18,7 @@ import Login from './pages/Login';
 import AdminPanel from './pages/AdminPanel';
 import MyCompanyRequests from './pages/MyCompanyRequests';
 import PositionRequests from './pages/PositionRequests';
+import InvestmentOpportunities from './pages/InvestmentOpportunities';
 import EditCompany from './pages/EditCompany';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfUse from './pages/TermsOfUse';
@@ -121,6 +122,7 @@ function Shell() {
       <Route path="/companies" element={<Protected><Companies /></Protected>} />
       <Route path="/my-company-requests" element={<Protected><MyCompanyRequests /></Protected>} />
       <Route path="/position-requests" element={<Protected><PositionRequests /></Protected>} />
+      <Route path="/investment-opportunities" element={<Protected><InvestmentOpportunities /></Protected>} />
       <Route path="/mynetwork" element={<Protected><Network /></Protected>} />
       <Route path="/jobs" element={<Protected><Jobs /></Protected>} />
       <Route path="/my-applications" element={<Protected><MyApplications /></Protected>} />

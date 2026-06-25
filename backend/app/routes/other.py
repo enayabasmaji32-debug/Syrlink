@@ -7,7 +7,8 @@ import random
 
 from app.models import VerificationRequestIn, ReportIn, CompanyRequestDecisionIn, SuspendUserIn, ReportResolveIn
 from app.security import get_current_user, require_admin
-from app.utils import uid, now_iso, create_notification, fetch_user_brief
+from app.utils import uid, now_iso, create_notification, fetch_user_brief, time_ago
+from app.news_utils import rewriteHeadline, summarizePost, detectCategory
 from app.database import db
 from app.config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 import cloudinary.utils
@@ -15,73 +16,6 @@ import os
 
 NEWS_CACHE = None
 NEWS_CACHE_UPDATED = 0
-
-CATEGORY_KEYWORDS = {
-    'تقنية': ['tech', 'technology', 'برمج', 'تطوير', 'تقنية', 'ai', 'data', 'machine learning', 'برمجيات', 'software', 'hardware'],
-    'وظائف': ['وظيفة', 'توظيف', 'career', 'job', 'hiring', 'موظف', 'وظائف', 'تدريب', 'internship', 'job fair'],
-    'شركات ناشئة': ['ناشئة', 'startup', 'تمويل', 'funding', 'entrepreneur', 'شركة ناشئة', 'incubator', 'accelerator'],
-    'سوق': ['سوق', 'استثمار', 'سهم', 'بورصة', 'trade', 'تجارة', 'سعر', 'market', 'crypto', 'عملات'],
-    'مجتمع': ['مجتمع', 'events', 'لقاء', 'network', 'دعم', 'community', 'منظمة', 'نشاط', 'culture'],
-}
-
-CATEGORY_LABELS = ['تقنية', 'وظائف', 'شركات ناشئة', 'سوق', 'مجتمع']
-
-
-def detectCategory(content: str) -> str:
-    text = (content or '').lower()
-    for category, keywords in CATEGORY_KEYWORDS.items():
-        for keyword in keywords:
-            if keyword in text:
-                return category
-    return 'مجتمع'
-
-
-def rewriteHeadline(content: str) -> str:
-    text = (content or '').strip().replace('\n', ' ').replace('\r', ' ')
-    if not text:
-        return 'خبر رائج من SyrLink'
-    first_sentence = text.split('. ')[0].strip()
-    if len(first_sentence) < 12 and len(text) > 60:
-        first_sentence = text[:60].strip()
-    headline = first_sentence[:80].rstrip()
-    if len(text) > len(headline):
-        headline = headline.rstrip('.,') + '...'
-    return headline
-
-
-def summarizePost(content: str) -> str:
-    text = (content or '').strip().replace('\n', ' ').replace('\r', ' ')
-    if not text:
-        return 'اكتشف أهم الأخبار والمشاركات الرائجة على منصة SyrLink.'
-    sentences = [s.strip() for s in text.split('. ') if s.strip()]
-    if sentences:
-        summary = sentences[0]
-    else:
-        summary = text
-    if len(summary) > 120:
-        return summary[:117].rstrip() + '...'
-    return summary
-
-
-def timeAgo(created_at: str) -> str:
-    if not created_at:
-        return 'منذ قليل'
-    try:
-        dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-    except ValueError:
-        return 'منذ قليل'
-    diff = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) - dt.astimezone(datetime.timezone.utc)
-    seconds = int(diff.total_seconds())
-    if seconds < 60:
-        return 'منذ ثوانٍ'
-    if seconds < 3600:
-        minutes = seconds // 60
-        return f'قبل {minutes} دقيقة' if minutes == 1 else f'قبل {minutes} دقائق'
-    if seconds < 86400:
-        hours = seconds // 3600
-        return f'قبل {hours} ساعة' if hours == 1 else f'قبل {hours} ساعات'
-    days = seconds // 86400
-    return f'منذ يوم' if days == 1 else f'منذ {days} أيام'
 
 
 async def generateSyrLinkNews(limit: int = 10, refresh: bool = False):
@@ -112,7 +46,7 @@ async def generateSyrLinkNews(limit: int = 10, refresh: bool = False):
         summary = summarizePost(post.get('content', ''))
         category = detectCategory(post.get('content', ''))
         readers = random.randint(5000, 30000)
-        relative_time = timeAgo(post.get('created_at', ''))
+        relative_time = time_ago(post.get('created_at', ''))
         news_items.append({
             'id': f'news-{post["id"]}',
             'post_id': post['id'],
@@ -274,11 +208,27 @@ async def admin_delete_user(
     user_id: str,
     admin: Annotated[dict, Depends(require_admin)],
 ):
-    """Delete a user (for admin)."""
+    """Delete a user and all related data (for admin)."""
     if user_id == admin["id"]:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
     await db.users.delete_one({"id": user_id})
     await db.posts.delete_many({"author_id": user_id})
+    await db.messages.delete_many({"sender_id": user_id})
+    await db.conversations.delete_many({"participants": user_id})
+    await db.connections.delete_many({"$or": [{"requester_id": user_id}, {"receiver_id": user_id}]})
+    await db.followers.delete_many({"$or": [{"follower_id": user_id}, {"following_id": user_id}]})
+    await db.notifications.delete_many({"$or": [{"user_id": user_id}, {"actor_id": user_id}]})
+    await db.job_applications.delete_many({"user_id": user_id})
+    await db.job_seeker_requests.delete_many({"user_id": user_id})
+    await db.recommendations.delete_many({"$or": [{"from_id": user_id}, {"to_id": user_id}]})
+    await db.endorsements.delete_many({"$or": [{"from_id": user_id}, {"user_id": user_id}]})
+    await db.reports.delete_many({"reporter_id": user_id})
+    await db.verification_requests.delete_many({"user_id": user_id})
+    await db.blocked_users.delete_many({"$or": [{"blocker_id": user_id}, {"blocked_id": user_id}]})
+    await db.companies.update_many(
+        {"employees.id": user_id},
+        {"$pull": {"employees": {"id": user_id}}}
+    )
     return {"ok": True}
 
 

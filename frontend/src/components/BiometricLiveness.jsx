@@ -160,15 +160,15 @@ export default function BiometricLiveness({ onComplete, onBack }) {
     let eyeTop, eyeBottom, eyeLeft, eyeRight;
 
     if (eye === 'left') {
-      eyeLeft = landmarks[42]; // Left eye left corner
-      eyeRight = landmarks[39]; // Left eye right corner
-      eyeTop = landmarks[37]; // Left eye top
-      eyeBottom = landmarks[41]; // Left eye bottom
+      eyeLeft = landmarks[45]; // Left eye outer corner
+      eyeRight = landmarks[42]; // Left eye inner corner
+      eyeTop = landmarks[43]; // Left eye top
+      eyeBottom = landmarks[47]; // Left eye bottom
     } else {
-      eyeLeft = landmarks[36]; // Right eye left corner
-      eyeRight = landmarks[35]; // Right eye right corner
-      eyeTop = landmarks[28]; // Right eye top
-      eyeBottom = landmarks[31]; // Right eye bottom
+      eyeLeft = landmarks[39]; // Right eye inner corner
+      eyeRight = landmarks[36]; // Right eye outer corner
+      eyeTop = landmarks[37]; // Right eye top
+      eyeBottom = landmarks[41]; // Right eye bottom
     }
 
     const eyeHeight = Math.abs(eyeTop.y - eyeBottom.y);

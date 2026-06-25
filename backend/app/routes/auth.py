@@ -1,11 +1,11 @@
-﻿"""Authentication routes."""
-from fastapi import APIRouter, HTTPException, Depends, Request
+"""Authentication routes."""
+from fastapi import APIRouter, HTTPException, Depends, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 import httpx
 import secrets
 from urllib.parse import urlencode
 
-from app.security import create_token, get_current_user
+from app.security import create_token, create_refresh_token, verify_refresh_token, get_current_user
 from app.utils import uid, now_iso
 from app.database import db
 from app.config import (
@@ -20,6 +20,8 @@ from app.config import (
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
     GOOGLE_OAUTH_REDIRECT,
+    JWT_REFRESH_COOKIE_NAME,
+    JWT_REFRESH_EXPIRY_DAYS,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -255,6 +257,7 @@ async def github_callback(request: Request, code: str | None = None, state: str 
         )
 
     token = create_token(user["id"], email)
+    refresh_token = create_refresh_token(user["id"], email)
     user.pop("_id", None)
     user.pop("password_hash", None)
 
@@ -267,6 +270,15 @@ async def github_callback(request: Request, code: str | None = None, state: str 
         secure=COOKIE_SECURE,
         samesite="lax",
         max_age=JWT_COOKIE_MAX_AGE,
+        path="/",
+    )
+    response.set_cookie(
+        key=JWT_REFRESH_COOKIE_NAME,
+        value=refresh_token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=JWT_REFRESH_EXPIRY_DAYS * 86400,
         path="/",
     )
     response.delete_cookie(key="oauth_state_github", path="/")
@@ -377,6 +389,7 @@ async def google_callback(request: Request, code: str | None = None, state: str 
         )
 
     token = create_token(user["id"], email)
+    refresh_token = create_refresh_token(user["id"], email)
     user.pop("_id", None)
     user.pop("password_hash", None)
 
@@ -391,6 +404,15 @@ async def google_callback(request: Request, code: str | None = None, state: str 
         max_age=JWT_COOKIE_MAX_AGE,
         path="/",
     )
+    response.set_cookie(
+        key=JWT_REFRESH_COOKIE_NAME,
+        value=refresh_token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=JWT_REFRESH_EXPIRY_DAYS * 86400,
+        path="/",
+    )
     response.delete_cookie(key="oauth_state_google", path="/")
     return response
 
@@ -400,11 +422,49 @@ async def me(current=Depends(get_current_user)):
     return current
 
 
+@router.post("/refresh")
+async def refresh_token(request: Request):
+    """Refresh access token using httpOnly refresh cookie."""
+    refresh = request.cookies.get(JWT_REFRESH_COOKIE_NAME)
+    if not refresh:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
+    payload = await verify_refresh_token(refresh)
+    user = await db.users.find_one({"id": payload["sub"]})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    new_token = create_token(user["id"], user["email"])
+    new_refresh = create_refresh_token(user["id"], user["email"])
+    response = JSONResponse({"ok": True})
+    response.set_cookie(
+        key=JWT_COOKIE_NAME,
+        value=new_token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=JWT_COOKIE_MAX_AGE,
+        path="/",
+    )
+    response.set_cookie(
+        key=JWT_REFRESH_COOKIE_NAME,
+        value=new_refresh,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=JWT_REFRESH_EXPIRY_DAYS * 86400,
+        path="/",
+    )
+    return response
+
+
 @router.post("/logout")
 async def logout() -> JSONResponse:
     response = JSONResponse({"ok": True})
     response.delete_cookie(
         key=JWT_COOKIE_NAME,
+        path="/",
+    )
+    response.delete_cookie(
+        key=JWT_REFRESH_COOKIE_NAME,
         path="/",
     )
     # Clear both provider-specific state cookies

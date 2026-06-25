@@ -136,6 +136,11 @@ export const repostApi = {
   repost: (id, comment = '') => c.post(`/posts/${id}/repost`, { comment }).then((r) => r.data),
 };
 
+export const livenessApi = {
+  challenge: () => c.post('/auth/liveness/challenge').then((r) => r.data),
+  verify: (sessionId, framesBase64) => c.post('/auth/liveness/verify', { session_id: sessionId, frames_base64: framesBase64 }).then((r) => r.data),
+};
+
 export const verificationApi = {
   submit: (d) => c.post('/verification/request', d).then((r) => r.data),
   me: () => c.get('/verification/me').then((r) => r.data),
@@ -162,7 +167,11 @@ export const companyRequestsApi = {
 
 export const companiesApi = {
   get: (id) => c.get(`/companies/${id}`).then((r) => r.data),
-  list: (q = '', skip = 0, limit = 20) => c.get(`/companies?q=${encodeURIComponent(q)}&skip=${skip}&limit=${limit}`).then((r) => r.data),
+  list: (q = '', skip = 0, limit = 20, seeking_investment = false) => {
+    let url = `/companies?q=${encodeURIComponent(q)}&skip=${skip}&limit=${limit}`;
+    if (seeking_investment) url += '&seeking_investment=true';
+    return c.get(url).then((r) => r.data);
+  },
   myCompanies: () => c.get('/companies/me').then((r) => r.data),
   create: (d) => c.post('/companies', d).then((r) => r.data),
   update: (id, d) => c.put(`/companies/${id}`, d).then((r) => r.data),

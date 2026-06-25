@@ -85,16 +85,16 @@ async def user_suggestions(limit: int = 10, current=Depends(get_current_user)):
 
 @router.get("/search")
 async def search_users(q: str, current=Depends(get_current_user)):
-    """Search users by name or email."""
+    """Search users by name only (email is private)."""
     if not q:
         return []
     query = {
-        "$or": [
-            {"name": {"$regex": q, "$options": "i"}},
-            {"email": {"$regex": q, "$options": "i"}},
-        ]
+        "name": {"$regex": q, "$options": "i"}
     }
-    users = await db.users.find(query, {"_id": 0, "id": 1, "name": 1, "avatar": 1, "headline": 1, "email": 1}).limit(20).to_list(20)
+    users = await db.users.find(
+        query,
+        {"_id": 0, "id": 1, "name": 1, "avatar": 1, "headline": 1, "verified": 1}
+    ).limit(20).to_list(20)
     return users
 
 
@@ -105,6 +105,33 @@ async def get_user(user_id: str, current=Depends(get_current_user)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+
+@router.delete("/me")
+async def delete_my_account(current=Depends(get_current_user)):
+    """Delete current user's own account (GDPR-style right to erasure)."""
+    user_id = current["id"]
+    # Cascade delete all user data
+    await db.users.delete_one({"id": user_id})
+    await db.posts.delete_many({"author_id": user_id})
+    await db.messages.delete_many({"sender_id": user_id})
+    await db.conversations.delete_many({"participants": user_id})
+    await db.connections.delete_many({"$or": [{"requester_id": user_id}, {"receiver_id": user_id}]})
+    await db.followers.delete_many({"$or": [{"follower_id": user_id}, {"following_id": user_id}]})
+    await db.notifications.delete_many({"$or": [{"user_id": user_id}, {"actor_id": user_id}]})
+    await db.job_applications.delete_many({"user_id": user_id})
+    await db.job_seeker_requests.delete_many({"user_id": user_id})
+    await db.recommendations.delete_many({"$or": [{"from_id": user_id}, {"to_id": user_id}]})
+    await db.endorsements.delete_many({"$or": [{"from_id": user_id}, {"user_id": user_id}]})
+    await db.reports.delete_many({"reporter_id": user_id})
+    await db.verification_requests.delete_many({"user_id": user_id})
+    await db.blocked_users.delete_many({"$or": [{"blocker_id": user_id}, {"blocked_id": user_id}]})
+    # Remove from company employees
+    await db.companies.update_many(
+        {"employees.id": user_id},
+        {"$pull": {"employees": {"id": user_id}}}
+    )
+    return {"ok": True}
 
 
 @router.put("/me")

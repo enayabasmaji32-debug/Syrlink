@@ -48,8 +48,8 @@ export function AppProvider({ children }) {
   const [language, setLanguage] = useState(() => localStorage.getItem('li_language') || 'ar');
   const [createContentType, setCreateContentType] = useState(null); // 'post' | 'article' | 'event'
 
-  // WebSocket for real-time online status
-  const { onlineUsers, isUserOnline } = useOnlineStatus();
+  // WebSocket for real-time online status and notifications
+  const { onlineUsers, isUserOnline, notifications: wsNotifications } = useOnlineStatus();
 
   // On mount: try to restore session - NON-BLOCKING
   useEffect(() => {
@@ -173,7 +173,7 @@ export function AppProvider({ children }) {
     loadOwnedCompanies();
   }, [user, loadOwnedCompanies]);
 
-  // Load notifications when user changes (only on mount and when user changes, polling with reduced frequency)
+  // Load notifications once on mount, then merge WebSocket notifications
   useEffect(() => {
     if (!user) {
       setNotifications([]);
@@ -189,30 +189,19 @@ export function AppProvider({ children }) {
       }
     };
 
-    const handleVisibilityChange = () => {
-      if (!document.hidden && !interval) {
-        interval = setInterval(fetchNotifications, 45000);
-      } else if (document.hidden && interval) {
-        clearInterval(interval);
-        interval = null;
-      }
-    };
-
-    let interval = null;
     fetchNotifications();
+  }, [user?.id]);
 
-    if (!document.hidden) {
-      interval = setInterval(fetchNotifications, 45000);
+  // Merge WebSocket notifications into state
+  useEffect(() => {
+    if (wsNotifications.length > 0) {
+      setNotifications((prev) => {
+        const existingIds = new Set(prev.map((n) => n.id));
+        const newItems = wsNotifications.filter((n) => !existingIds.has(n.id));
+        return [...newItems, ...prev];
+      });
     }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      if (interval) clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [user?.id]); // Only depend on user.id to prevent recreating interval
-
+  }, [wsNotifications]);
   const logout = async () => {
     try {
       await authApi.logout();

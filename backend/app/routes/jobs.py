@@ -11,8 +11,9 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.get("")
-async def list_jobs(q: Optional[str] = None, location: Optional[str] = None, current=Depends(get_current_user)):
-    """List jobs with optional filtering."""
+async def list_jobs(q: Optional[str] = None, location: Optional[str] = None, cursor: Optional[str] = None, limit: int = 20, current=Depends(get_current_user)):
+    """List jobs with cursor-based pagination."""
+    limit = min(max(limit, 1), 50)
     query: Dict[str, Any] = {}
     if q:
         query["$or"] = [
@@ -22,13 +23,16 @@ async def list_jobs(q: Optional[str] = None, location: Optional[str] = None, cur
         ]
     if location:
         query["location"] = {"$regex": location, "$options": "i"}
+    if cursor:
+        query["posted_at"] = {"$lt": cursor}
     
-    jobs = await db.jobs.find(query, {"_id": 0}).sort("posted_at", -1).to_list(200)
+    jobs = await db.jobs.find(query, {"_id": 0}).sort("posted_at", -1).limit(limit).to_list(limit)
     for j in jobs:
         j["postedAgo"] = time_ago(j.get("posted_at", now_iso()))
         j["applicants"] = j.get("applicants_count", 0)
         j["easyApply"] = j.get("easy_apply", True)
-    return jobs
+    next_cursor = jobs[-1]["posted_at"] if len(jobs) == limit else None
+    return {"items": jobs, "next_cursor": next_cursor}
 
 
 @router.get("/me/saved")
@@ -139,6 +143,13 @@ async def create_job_posting(data: JobPostingIn, current=Depends(get_current_use
     
     # Check if user is admin or company representative
     # For now, allow any logged-in user to post; you can add company_id to users later
+    
+    # Check if user is a verified company representative
+    employee = await db.companies.find_one(
+        {"id": data.company_id, "employees": {"$elemMatch": {"id": current["id"]}}}
+    )
+    if not employee and not current.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Only verified company representatives can post jobs")
     
     doc = {
         "id": uid(),

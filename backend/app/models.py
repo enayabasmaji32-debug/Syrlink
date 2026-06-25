@@ -1,7 +1,17 @@
 """Pydantic models for request/response validation."""
 from typing import List, Optional, Literal
-from pydantic import BaseModel, Field, EmailStr, ConfigDict
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator
 import uuid as _uuid
+
+
+_ALLOWED_IMAGE_DOMAINS = {
+    "res.cloudinary.com",
+    "images.unsplash.com",
+    "images.pexels.com",
+    "api.dicebear.com",
+    "avatars.githubusercontent.com",
+    "lh3.googleusercontent.com",
+}
 
 
 def uid() -> str:
@@ -78,6 +88,7 @@ class LoginIn(BaseModel):
 
 
 class UserUpdateIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     name: Optional[str] = None
     headline: Optional[str] = None
     location: Optional[str] = None
@@ -90,6 +101,26 @@ class UserUpdateIn(BaseModel):
     languages: Optional[List[str]] = None
     experience: Optional[List[ExperienceItem]] = None
     education: Optional[List[EducationItem]] = None
+
+    @field_validator("avatar", "cover", "cv")
+    @classmethod
+    def check_media_url(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return v
+        from urllib.parse import urlparse
+        domain = urlparse(v).netloc.lower()
+        if not any(domain.endswith(d) for d in _ALLOWED_IMAGE_DOMAINS):
+            raise ValueError(f"URL must be from an allowed domain: {v}")
+        return v
+
+    @field_validator("github")
+    @classmethod
+    def check_github_url(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return v
+        if not v.startswith("https://github.com/"):
+            raise ValueError("GitHub URL must start with https://github.com/")
+        return v
 
 
 class VerifyEmailIn(BaseModel):
